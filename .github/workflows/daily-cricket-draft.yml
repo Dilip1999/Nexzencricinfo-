@@ -2,8 +2,8 @@ name: Daily Cricket News Draft
 
 on:
   schedule:
-    # 03:00 UTC = 08:30 India Standard Time (IST)
-    - cron: "0 3 * * *"
+    # 04:30 UTC = 10:00 AM India Standard Time (IST)
+    - cron: "30 4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,8 +32,6 @@ jobs:
 
       - name: Generate caption draft
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           PUBLISH_TO_INSTAGRAM: "false"
         run: python cricket_agent.py
 
