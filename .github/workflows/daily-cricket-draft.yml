@@ -1,0 +1,50 @@
+name: Daily Cricket News Draft
+
+on:
+  schedule:
+    # 03:00 UTC = 08:30 India Standard Time (IST)
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-cricket-draft
+  cancel-in-progress: false
+
+jobs:
+  generate-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate caption draft
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          PUBLISH_TO_INSTAGRAM: "false"
+        run: python cricket_agent.py
+
+      - name: Commit generated draft
+        run: |
+          if git diff --quiet -- drafts/; then
+            echo "No draft changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drafts/
+          git commit -m "Add daily cricket news draft"
+          git push
