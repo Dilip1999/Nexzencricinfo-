@@ -13,7 +13,7 @@ from openai import OpenAI
 
 IST = ZoneInfo("Asia/Kolkata")
 OUTPUT_DIR = Path("drafts")
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+MODEL = os.getenv("OPENAI_MODEL", "").strip() or "gpt-4.1-mini"
 NEWS_FEED = (
     "https://news.google.com/rss/search?q="
     "cricket+(India+OR+IPL+OR+ICC+OR+Test+OR+ODI+OR+T20)&hl=en-IN&gl=IN&ceid=IN:en"
