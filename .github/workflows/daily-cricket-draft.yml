@@ -2,20 +2,22 @@ name: Daily Cricket News and Instagram
 
 on:
   schedule:
-    - cron: "30 4 * * *" # 10:00 AM IST
+    - cron: "0 6 * * *"  # 11:30 AM IST
+    - cron: "0 11 * * *" # 4:30 PM IST
+    - cron: "0 16 * * *" # 9:30 PM IST
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: daily-cricket-publisher
+  group: nexzen-cricket-publisher
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,11 +28,35 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - name: Determine publishing slot
+        id: slot
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$SCHEDULE" = "0 6 * * *" ]; then SLOT=morning
+          elif [ "$SCHEDULE" = "0 11 * * *" ]; then SLOT=evening
+          elif [ "$SCHEDULE" = "0 16 * * *" ]; then SLOT=night
+          else
+            HOUR=$(TZ=Asia/Kolkata date +%H)
+            if [ "$HOUR" -lt 14 ]; then SLOT=morning
+            elif [ "$HOUR" -lt 19 ]; then SLOT=evening
+            else SLOT=night
+            fi
+          fi
+          echo "slot=$SLOT" >> "$GITHUB_OUTPUT"
+          echo "Publishing slot: $SLOT"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Generate cricket draft and graphic
+      - name: Generate engaging cricket carousel
+        env:
+          POST_SLOT: ${{ steps.slot.outputs.slot }}
         run: python cricket_agent.py
-      - name: Commit generated draft and image
+      - name: Commit generated draft and images
         run: |
           git add drafts/ images/
           if git diff --cached --quiet; then
@@ -38,7 +64,7 @@ jobs:
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Generate daily cricket graphic"
+            git commit -m "Generate cricket news carousel"
             git push
           fi
       - name: Publish to Instagram
@@ -48,16 +74,17 @@ jobs:
           INSTAGRAM_USER_ID: ${{ vars.INSTAGRAM_USER_ID }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          POST_SLOT: ${{ steps.slot.outputs.slot }}
         run: python publish_instagram.py
       - name: Commit Instagram publication record
         if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true'
         run: |
-          git add posted.json
+          git add posted.json content_history.json
           if git diff --cached --quiet; then
             echo "No publication record change."
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Record Instagram publication"
+            git commit -m "Record Instagram publication and content history"
             git push
           fi
