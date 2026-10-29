@@ -70,7 +70,7 @@ def create_image(title: str, date: str, path: Path):
     d.text((130, 1108), "Follow @nexzencricinfo for more", font=font(28, True), fill=(8, 20, 43))
     d.text((95, 1215), "WHERE NEXT GEN CRICKET BEGINS", font=font(24, True), fill=(190, 215, 240))
     path.parent.mkdir(parents=True, exist_ok=True)
-    im.save(path, "PNG", optimize=True)
+    im.save(path, "JPEG", quality=90, optimize=True)
 
 def main():
     today = datetime.now(IST).date().isoformat()
@@ -86,7 +86,7 @@ def main():
              "\n".join(f"- [{x['title']}]({x['url']})" for x in articles) +
              f"\n\nGenerated at {datetime.now(timezone.utc).isoformat()} (UTC)\n")
     Path("drafts", f"{today}.md").write_text(draft, encoding="utf-8")
-    create_image(a["title"], today, Path("images", f"{today}.png"))
+    create_image(a["title"], today, Path("images", f"{today}.jpg"))
     print(f"Draft and graphic created for {today}")
 
 if __name__ == "__main__":
