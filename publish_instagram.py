@@ -1,4 +1,4 @@
-"""Publish the generated daily PNG through the Instagram Graph API."""
+"""Publish the generated daily JPEG through the Instagram Graph API."""
 from __future__ import annotations
 
 import json
@@ -28,7 +28,7 @@ def main() -> None:
         print(f"Already published for {today}; skipping duplicate.")
         return
 
-    image_path = Path("images") / f"{today}.png"
+    image_path = Path("images") / f"{today}.jpg"
     if not image_path.exists():
         raise FileNotFoundError(f"Generated image not found: {image_path}")
     # Instagram fetches this URL remotely. The repository must be public.
@@ -47,7 +47,13 @@ def main() -> None:
         data={"image_url": image_url, "caption": caption, "access_token": token},
         timeout=60,
     )
-    created.raise_for_status()
+    if not created.ok:
+        # Report Meta's response details, but never log the access token.
+        try:
+            detail = created.json()
+        except ValueError:
+            detail = created.text[:2000]
+        raise RuntimeError(f"Instagram container creation failed (HTTP {created.status_code}): {detail}")
     creation_id = created.json().get("id")
     if not creation_id:
         raise RuntimeError(f"Instagram container response did not include an id: {created.text}")
