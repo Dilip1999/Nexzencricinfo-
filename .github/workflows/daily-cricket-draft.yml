@@ -1,48 +1,63 @@
-name: Daily Cricket News Draft
+name: Daily Cricket News and Instagram
 
 on:
   schedule:
-    # 04:30 UTC = 10:00 AM India Standard Time (IST)
-    - cron: "30 4 * * *"
+    - cron: "30 4 * * *" # 10:00 AM IST
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: daily-cricket-draft
+  group: daily-cricket-publisher
   cancel-in-progress: false
 
 jobs:
-  generate-draft:
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Generate caption draft
-        env:
-          PUBLISH_TO_INSTAGRAM: "false"
+      - name: Generate cricket draft and graphic
         run: python cricket_agent.py
-
-      - name: Commit generated draft
+      - name: Commit generated draft and image
         run: |
-          git add drafts/
-          if git diff --cached --quiet -- drafts/; then
-            echo "No draft changes to commit."
-            exit 0
+          git add drafts/ images/
+          if git diff --cached --quiet; then
+            echo "No generated changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Generate daily cricket graphic"
+            git push
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Add daily cricket news draft"
-          git push
+      - name: Publish to Instagram
+        if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true'
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_USER_ID: ${{ vars.INSTAGRAM_USER_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python publish_instagram.py
+      - name: Commit Instagram publication record
+        if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true'
+        run: |
+          git add posted.json
+          if git diff --cached --quiet; then
+            echo "No publication record change."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Record Instagram publication"
+            git push
+          fi
