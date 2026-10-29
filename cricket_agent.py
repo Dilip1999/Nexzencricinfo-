@@ -40,24 +40,31 @@ def clean_summary(summary: str, title: str) -> str:
     return summary[:300]
 
 
+def story_key(title: str) -> str:
+    return re.sub(r"\\W+", " ", clean_text(title).lower()).strip()
+
+
 def fetch_articles() -> list[dict[str, str]]:
     feed = feedparser.parse(NEWS_FEED)
+    history_path = Path("content_history.json")
+    history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {"stories": []}
+    previously_used = {story_key(str(item.get("title", ""))) for item in history.get("stories", [])}
     items, seen = [], set()
     for entry in feed.entries:
         title = clean_text(str(entry.get("title", "")))
         url = str(entry.get("link", "")).strip()
-        normalized = re.sub(r"\W+", " ", title.lower()).strip()
-        if not title or not url or normalized in seen:
+        key = story_key(title)
+        if not title or not url or key in seen or key in previously_used:
             continue
-        seen.add(normalized)
+        seen.add(key)
         summary = clean_summary(str(entry.get("summary", "")), title)
         items.append({"title": title, "url": url, "summary": summary})
         if len(items) == MAX_ARTICLES:
             break
     if not items:
-        raise RuntimeError("No cricket articles returned by RSS feed.")
+        raise RuntimeError("No fresh cricket stories found after excluding previously published stories.")
+    print(f"Selected {len(items)} fresh stories (history excludes {len(previously_used)} prior stories).")
     return items
-
 
 def font(size: int, bold: bool = False):
     path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
