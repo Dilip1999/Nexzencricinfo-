@@ -63,13 +63,13 @@ def main() -> None:
         print(f"Already published slot {slot_key}; skipping duplicate.")
         return
 
-    slide_dir = Path("images") / today
+    slide_dir = Path("images") / today / slot
     slide_paths = [slide_dir / f"slide-{i}.jpg" for i in range(1, 7)]
     missing = [str(p) for p in slide_paths if not p.exists()]
     if missing:
         raise FileNotFoundError(f"Carousel slide(s) missing: {', '.join(missing)}")
 
-    draft = (Path("drafts") / f"{today}.md").read_text(encoding="utf-8")
+    draft = (Path("drafts") / f"{today}_{slot}.md").read_text(encoding="utf-8")
     caption = draft.split("\n\n", 1)[1].split("\n\n## Source notes (not included in Instagram caption)", 1)[0].strip()
     if not caption:
         raise RuntimeError("Instagram caption is empty after extracting the draft.")
