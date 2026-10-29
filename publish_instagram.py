@@ -120,8 +120,31 @@ def main() -> None:
         {"media_type": "CAROUSEL", "children": ",".join(child_ids),
          "caption": caption, "access_token": token}, "Create carousel container")
     wait_until_finished(carousel["id"], token, "Carousel container")
-    published = api_post(f"{user_id}/media_publish",
-        {"creation_id": carousel["id"], "access_token": token}, "Publish Instagram carousel")
+    # Instagram can report FINISHED before the carousel is actually publishable.
+    # Retry only the transient "media not ready" response; do not recreate containers.
+    publish_payload = {"creation_id": carousel["id"], "access_token": token}
+    for attempt in range(1, 13):
+        try:
+            published = api_post(
+                f"{user_id}/media_publish",
+                publish_payload,
+                "Publish Instagram carousel",
+            )
+            break
+        except RuntimeError as exc:
+            error_text = str(exc)
+            is_not_ready = (
+                '"code": 9007' in error_text
+                and '"error_subcode": 2207027' in error_text
+            )
+            if not is_not_ready or attempt == 12:
+                raise
+            delay = min(5 * attempt, 30)
+            print(
+                f"Carousel is not publishable yet (attempt {attempt}/12); "
+                f"waiting {delay}s before retry."
+            )
+            time.sleep(delay)
     media_id = published["id"]
 
     published_slots[slot_key] = media_id
