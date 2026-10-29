@@ -33,6 +33,28 @@ def api_post(path: str, data: dict, what: str) -> dict:
     return result
 
 
+def verify_account_access(user_id: str, token: str) -> None:
+    """Check the GitHub Actions token can read the configured Instagram account."""
+    response = requests.get(
+        f"{GRAPH_ROOT}/{user_id}",
+        params={"fields": "id,username", "access_token": token},
+        timeout=30,
+    )
+    if not response.ok:
+        # Never print request params: they include the secret access token.
+        try:
+            detail = response.json().get("error", {})
+            safe_detail = {key: detail.get(key) for key in ("message", "type", "code", "error_subcode") if key in detail}
+        except ValueError:
+            safe_detail = {"message": response.text[:500]}
+        raise RuntimeError(f"Instagram token/account diagnostic failed: {safe_detail}")
+
+    account = response.json()
+    print(f"Instagram token diagnostic passed: id={account.get('id')}, username={account.get('username')}")
+    if str(account.get("id")) != str(user_id):
+        raise RuntimeError("Instagram token diagnostic returned an ID different from INSTAGRAM_USER_ID.")
+
+
 def wait_until_finished(creation_id: str, token: str, what: str) -> None:
     for _ in range(24):
         response = requests.get(f"{GRAPH_ROOT}/{creation_id}",
@@ -50,6 +72,7 @@ def wait_until_finished(creation_id: str, token: str, what: str) -> None:
 def main() -> None:
     token = os.environ["INSTAGRAM_ACCESS_TOKEN"]
     user_id = os.environ["INSTAGRAM_USER_ID"]
+    verify_account_access(user_id, token)
     repo = os.environ["GITHUB_REPOSITORY"]
     branch = os.getenv("GITHUB_REF_NAME", "main")
     slot = os.getenv("POST_SLOT", "").strip().lower()
