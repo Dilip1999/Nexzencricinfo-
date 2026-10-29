@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import html
+import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,7 +43,7 @@ def clean_summary(summary: str, title: str) -> str:
 
 
 def story_key(title: str) -> str:
-    return re.sub(r"\\W+", " ", clean_text(title).lower()).strip()
+    return re.sub(r"\W+", " ", clean_text(title).lower()).strip()
 
 
 def fetch_articles() -> list[dict[str, str]]:
@@ -199,20 +201,23 @@ def build_caption(articles: list[dict[str, str]], date: str) -> str:
 
 def main():
     today = datetime.now(IST).date().isoformat()
+    slot = os.getenv("POST_SLOT", "manual").strip().lower()
+    if slot not in {"morning", "evening", "night", "manual"}:
+        raise RuntimeError(f"Invalid POST_SLOT: {slot!r}")
     articles = fetch_articles()
     caption = build_caption(articles, today)
     Path("drafts").mkdir(exist_ok=True)
-    image_dir = Path("images") / today
+    image_dir = Path("images") / today / slot
     image_dir.mkdir(parents=True, exist_ok=True)
     paths = create_carousel(articles, today, image_dir)
     draft = (
-        f"# NexZenCricInfo — Top 5 Cricket News ({today})\n\n{caption}\n\n"
+        f"# NexZenCricInfo — Top 5 Cricket News ({today} / {slot})\n\n{caption}\n\n"
         "## Source notes (not included in Instagram caption)\n\n"
         + "\n".join(f"{i}. {a['title']} — {a['url']}" for i, a in enumerate(articles, 1))
         + f"\n\nGenerated at {datetime.now(timezone.utc).isoformat()} (UTC)\n"
     )
-    Path("drafts", f"{today}.md").write_text(draft, encoding="utf-8")
-    print(f"Created a {len(paths)}-slide engaging cricket carousel for {today}")
+    Path("drafts", f"{today}_{slot}.md").write_text(draft, encoding="utf-8")
+    print(f"Created a {len(paths)}-slide carousel for {today} ({slot})")
 
 
 if __name__ == "__main__":
