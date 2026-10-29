@@ -12,7 +12,8 @@ from zoneinfo import ZoneInfo
 import requests
 
 IST = ZoneInfo("Asia/Kolkata")
-GRAPH_VERSION = os.getenv("GRAPH_API_VERSION", "v22.0")
+# Keep this aligned with the Graph API version configured and tested in Meta Graph API Explorer.
+GRAPH_VERSION = os.getenv("GRAPH_API_VERSION", "v26.0")
 GRAPH_ROOT = f"https://graph.facebook.com/{GRAPH_VERSION}"
 STATE_FILE = Path("posted.json")
 HISTORY_FILE = Path("content_history.json")
