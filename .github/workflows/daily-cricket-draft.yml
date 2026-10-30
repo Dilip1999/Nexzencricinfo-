@@ -64,6 +64,7 @@ jobs:
             git push
           fi
       - name: Publish to Instagram
+        id: instagram
         if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true'
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
@@ -73,7 +74,7 @@ jobs:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
         run: python publish_instagram.py
       - name: Remove published carousel images from repository
-        if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && success()
+        if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.instagram.outputs.status == 'published'
         run: |
           SLOT="${{ steps.slot.outputs.slot }}"
           TODAY=$(TZ=Asia/Kolkata date +%F)
