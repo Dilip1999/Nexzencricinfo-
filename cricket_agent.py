@@ -10,6 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import feedparser
+from opencricket_client import fetch_matches, match_to_article
 from PIL import Image, ImageDraw, ImageFont
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -47,11 +48,25 @@ def story_key(title: str) -> str:
 
 
 def fetch_articles() -> list[dict[str, str]]:
-    feed = feedparser.parse(NEWS_FEED)
+    """Combine fresh OpenCricket match data with Google News RSS."""
     history_path = Path("content_history.json")
     history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {"stories": []}
     previously_used = {story_key(str(item.get("title", ""))) for item in history.get("stories", [])}
     items, seen = [], set()
+    try:
+        for match in fetch_matches():
+            article = match_to_article(match)
+            if not article:
+                continue
+            key = story_key(article["title"])
+            if key and key not in previously_used and key not in seen:
+                seen.add(key)
+                items.append(article)
+                if len(items) >= MAX_ARTICLES:
+                    break
+    except Exception as exc:
+        print(f"OpenCricket API unavailable; using RSS fallback ({type(exc).__name__}).")
+    feed = feedparser.parse(NEWS_FEED)
     for entry in feed.entries:
         title = clean_text(str(entry.get("title", "")))
         url = str(entry.get("link", "")).strip()
@@ -59,13 +74,14 @@ def fetch_articles() -> list[dict[str, str]]:
         if not title or not url or key in seen or key in previously_used:
             continue
         seen.add(key)
-        summary = clean_summary(str(entry.get("summary", "")), title)
-        items.append({"title": title, "url": url, "summary": summary})
-        if len(items) == MAX_ARTICLES:
+        items.append({"title": title, "url": url,
+                      "summary": clean_summary(str(entry.get("summary", "")), title),
+                      "source": "Google News RSS"})
+        if len(items) >= MAX_ARTICLES:
             break
     if not items:
-        raise RuntimeError("No fresh cricket stories found after excluding previously published stories.")
-    print(f"Selected {len(items)} fresh stories (history excludes {len(previously_used)} prior stories).")
+        raise RuntimeError("No fresh cricket stories found from OpenCricket API or RSS.")
+    print(f"Selected {len(items)} fresh stories; history excludes {len(previously_used)} prior stories.")
     return items
 
 def font(size: int, bold: bool = False):
