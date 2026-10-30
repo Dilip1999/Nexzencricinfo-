@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -153,6 +154,10 @@ def main() -> None:
     known_urls = {str(item.get("url", "")) for item in history.get("stories", [])}
     history.setdefault("stories", []).extend(story for story in stories if story["url"] not in known_urls)
     HISTORY_FILE.write_text(json.dumps(history, indent=2) + "\n", encoding="utf-8")
+
+    # Remove the source carousel assets only after Instagram confirms publication.
+    shutil.rmtree(slide_dir)
+    print(f"Removed local carousel images for {slot_key} after successful publication.")
     print(f"Successfully published Instagram carousel {media_id} for {slot_key}; recorded {len(stories)} stories.")
 
 
