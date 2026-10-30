@@ -50,6 +50,7 @@ jobs:
       - name: Generate engaging cricket carousel
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
+          OPENCRICKET_API_KEY: ${{ secrets.OPENCRICKET_API_KEY }}
         run: python cricket_agent.py
       - name: Commit generated draft and images
         run: |
