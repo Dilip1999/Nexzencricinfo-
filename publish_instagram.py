@@ -75,7 +75,7 @@ def set_github_output(name: str, value: str) -> None:
     output_file = os.getenv("GITHUB_OUTPUT")
     if output_file:
         with open(output_file, "a", encoding="utf-8") as output:
-            output.write(f"{name}={value}\\n")
+            output.write(f"{name}={value}\n")
 
 
 def main() -> None:
