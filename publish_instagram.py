@@ -70,6 +70,14 @@ def wait_until_finished(creation_id: str, token: str, what: str) -> None:
     raise TimeoutError(f"{what} did not finish processing within 120 seconds.")
 
 
+def set_github_output(name: str, value: str) -> None:
+    """Expose a publishing result to later GitHub Actions steps."""
+    output_file = os.getenv("GITHUB_OUTPUT")
+    if output_file:
+        with open(output_file, "a", encoding="utf-8") as output:
+            output.write(f"{name}={value}\\n")
+
+
 def main() -> None:
     token = os.environ["INSTAGRAM_ACCESS_TOKEN"]
     user_id = os.environ["INSTAGRAM_USER_ID"]
@@ -86,6 +94,7 @@ def main() -> None:
     published_slots = state.setdefault("published_dates", {})
     if slot_key in published_slots:
         print(f"Already published slot {slot_key}; skipping duplicate.")
+        set_github_output("status", "skipped")
         return
 
     slide_dir = Path("images") / today / slot
@@ -159,6 +168,7 @@ def main() -> None:
     shutil.rmtree(slide_dir)
     print(f"Removed local carousel images for {slot_key} after successful publication.")
     print(f"Successfully published Instagram carousel {media_id} for {slot_key}; recorded {len(stories)} stories.")
+    set_github_output("status", "published")
 
 
 if __name__ == "__main__":
