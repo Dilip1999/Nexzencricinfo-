@@ -6,6 +6,12 @@ on:
     - cron: "0 11 * * *" # 4:30 PM IST
     - cron: "0 16 * * *" # 9:30 PM IST
   workflow_dispatch:
+    inputs:
+      force_publish:
+        description: "Publish again even if this slot was already published (urgent news)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -47,6 +53,18 @@ jobs:
           echo "Publishing slot: $SLOT"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Clean existing images for this slot
+        env:
+          POST_SLOT: ${{ steps.slot.outputs.slot }}
+        run: |
+          TODAY=$(TZ=Asia/Kolkata date +%F)
+          DIR="images/$TODAY/$POST_SLOT"
+          if [ -d "$DIR" ]; then
+            rm -rf "$DIR"
+            echo "Removed old generated images from $DIR"
+          else
+            echo "No old images found in $DIR"
+          fi
       - name: Generate engaging cricket carousel
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
@@ -72,6 +90,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           POST_SLOT: ${{ steps.slot.outputs.slot }}
+          FORCE_PUBLISH: ${{ inputs.force_publish || false }}
         run: python publish_instagram.py
       - name: Remove published carousel images from repository
         if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.instagram.outputs.status == 'published'
