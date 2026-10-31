@@ -5,6 +5,8 @@ import html
 import json
 import os
 import re
+from io import BytesIO
+from urllib.request import Request, urlopen
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -164,15 +166,61 @@ def save_slide(im, path: Path):
     im.save(path, "JPEG", quality=95, optimize=True, subsampling=0)
 
 
+def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image | None:
+    """Download and crop a feed-supplied cricket image; fail closed if unusable."""
+    url = article.get("image_url", "").strip()
+    if not url.startswith(("https://", "http://")):
+        return None
+    try:
+        request = Request(url, headers={"User-Agent": "NexZenCricInfo/1.0 (editorial image fetch)"})
+        with urlopen(request, timeout=8) as response:
+            if not response.headers.get("Content-Type", "").startswith("image/"):
+                return None
+            data = response.read(8 * 1024 * 1024 + 1)
+        if len(data) > 8 * 1024 * 1024:
+            return None
+        with Image.open(BytesIO(data)) as source:
+            photo = source.convert("RGB")
+            photo.thumbnail((size[0] * 2, size[1] * 2), Image.Resampling.LANCZOS)
+            target_ratio = size[0] / size[1]
+            ratio = photo.width / photo.height
+            if ratio > target_ratio:
+                new_width = int(photo.height * target_ratio)
+                left = (photo.width - new_width) // 2
+                photo = photo.crop((left, 0, left + new_width, photo.height))
+            else:
+                new_height = int(photo.width / target_ratio)
+                top = (photo.height - new_height) // 2
+                photo = photo.crop((0, top, photo.width, top + new_height))
+            return photo.resize(size, Image.Resampling.LANCZOS)
+    except Exception as exc:
+        print(f"Skipping unusable article image ({type(exc).__name__}).")
+        return None
+
+
+def place_photo(im: Image.Image, article: dict[str, str], bounds: tuple[int, int, int, int], overlay: int = 75) -> bool:
+    """Place an image in a fixed editorial frame with a subtle dark veil."""
+    left, top, right, bottom = bounds
+    photo = fetch_photo(article, (right - left, bottom - top))
+    if photo is None:
+        return False
+    veil = Image.new("RGBA", photo.size, (35, 31, 32, overlay))
+    photo = Image.alpha_composite(photo.convert("RGBA"), veil).convert("RGB")
+    im.paste(photo, (left, top))
+    return True
+
+
 def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) -> list[Path]:
     paths = []
     # Cover slide with stronger hierarchy and a compact story rundown.
     im, d = base_slide(1, date)
     d.rectangle((68, 210, 1012, 1150), fill=(239, 230, 214), outline=ORANGE, width=2)
-    d.text((100, 260), "THE DAILY EDITION", font=font(36, True), fill=NAVY)
-    d.text((95, 325), "CRICKET", font=font(100, True), fill=BLUE)
-    d.text((95, 430), "JOURNAL", font=font(92, True), fill=NAVY)
-    d.text((102, 555), "Five stories shaping the game today.", font=font(27), fill=NAVY)
+    if articles:
+        place_photo(im, articles[0], (68, 210, 1012, 620), overlay=105)
+    d.text((100, 260), "THE DAILY EDITION", font=font(36, True), fill=WHITE)
+    d.text((95, 325), "CRICKET", font=font(100, True), fill=WHITE)
+    d.text((95, 430), "JOURNAL", font=font(92, True), fill=WHITE)
+    d.text((102, 555), "Five stories shaping the game today.", font=font(27), fill=WHITE)
     d.rounded_rectangle((100, 635, 980, 1055), radius=25, fill=(247, 241, 230), outline=ORANGE, width=2)
     for i, article in enumerate(articles, 1):
         y = 670 + (i - 1) * 78
@@ -190,11 +238,13 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
         im, d = base_slide(index + 1, date)
         d.rectangle((68, 205, 1012, 310), fill=(232, 220, 199))
         d.text((100, 238), f"THE DAILY EDITION   /   STORY {index:02d}", font=font(25, True), fill=BLUE)
-        d.text((72, 350), f"0{index}", font=font(110, True), fill=BLUE)
-
-        # Keep headlines inside a reserved region and scale before trimming.
-        title_font, title_lines = fit_text(d, article["title"], 850, 5, 48, 34, True)
-        title_y = 500
+        photo_ok = place_photo(im, article, (72, 330, 1008, 760), overlay=115)
+        if not photo_ok:
+            d.rectangle((72, 330, 1008, 760), fill=(239, 230, 214), outline=ORANGE, width=2)
+            d.text((110, 520), "THE CRICKET JOURNAL", font=font(42, True), fill=BLUE)
+        # Headline appears over a photo-led frame with editorial contrast.
+        title_font, title_lines = fit_text(d, article["title"], 850, 4, 46, 32, True)
+        title_y = 785
         title_spacing = title_font.size + 16
         for line in title_lines:
             d.text((78, title_y), line, font=title_font, fill=NAVY)
