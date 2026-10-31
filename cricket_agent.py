@@ -17,14 +17,14 @@ IST = ZoneInfo("Asia/Kolkata")
 NEWS_FEED = "https://news.google.com/rss/search?q=cricket+(India+OR+IPL+OR+ICC+OR+Test+OR+ODI+OR+T20)&hl=en-IN&gl=IN&ceid=IN:en"
 MAX_ARTICLES = 5
 SIZE = (1080, 1350)
-NAVY = (43, 38, 39)       # Charcoal
-PANEL = (247, 241, 230)   # Warm ivory
-BLUE = (111, 31, 49)      # Burgundy
-TEAL = (111, 31, 49)      # Burgundy accent
-ORANGE = (178, 137, 72)   # Muted gold
-GOLD = (178, 137, 72)     # Muted gold
-WHITE = (247, 241, 230)   # Ivory
-MUTED = (105, 96, 89)     # Warm grey
+NAVY = (35, 31, 32)       # Editorial charcoal
+PANEL = (250, 246, 239)   # Light editorial ivory
+BLUE = (105, 24, 42)      # Deep burgundy
+TEAL = (105, 24, 42)      # Burgundy brand accent
+ORANGE = (183, 145, 82)   # Restrained editorial gold
+GOLD = (183, 145, 82)     # Restrained editorial gold
+WHITE = (250, 246, 239)   # Ivory for dark panels only
+MUTED = (103, 91, 83)     # Readable warm grey
 
 
 def clean_text(value: str) -> str:
@@ -122,12 +122,12 @@ def base_slide(slide_no: int, date: str):
     im = gradient_background()
     d = ImageDraw.Draw(im)
     d.rectangle((0, 0, 1080, 1350), fill=PANEL)
-    d.rectangle((0, 0, 18, 1350), fill=BLUE)
-    d.rectangle((1062, 0, 1080, 1350), fill=BLUE)
-    d.rectangle((48, 42, 1032, 1308), outline=ORANGE, width=2)
-    # Graphic corner accents create a sharper editorial/sports identity.
-    d.polygon([(760, 44), (1030, 44), (1030, 230)], fill=(232, 220, 199))
-    d.polygon([(48, 1040), (48, 1308), (300, 1308)], fill=(232, 220, 199))
+    d.rectangle((0, 0, 14, 1350), fill=BLUE)
+    d.rectangle((1066, 0, 1080, 1350), fill=BLUE)
+    d.rectangle((42, 36, 1038, 1314), outline=ORANGE, width=2)
+    # Restrained magazine-style corner motifs; keep the text area clean.
+    d.line((850, 38, 1038, 226), fill=(232, 220, 199), width=5)
+    d.line((42, 1124, 230, 1312), fill=(232, 220, 199), width=5)
     d.text((66, 58), "NEXZENCRICINFO", font=font(31, True), fill=TEAL)
     d.text((68, 108), "THE CRICKET JOURNAL  /  NEWS & INSIGHT", font=font(18, True), fill=MUTED)
     d.line((68, 160, 1012, 160), fill=ORANGE, width=2)
@@ -154,9 +154,9 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
     for i, article in enumerate(articles, 1):
         y = 675 + (i - 1) * 76
         d.ellipse((130, y, 180, y + 50), fill=TEAL)
-        d.text((146, y + 8), str(i), font=font(24, True), fill=NAVY)
-        lines = wrap(d, article["title"], font(21, True), 735)
-        d.text((205, y + 5), lines[0][:90], font=font(21, True), fill=NAVY)
+        d.text((146, y + 8), str(i), font=font(24, True), fill=WHITE)
+        lines = wrap(d, article["title"], font(20, True), 735)
+        d.text((205, y + 5), lines[0][:90], font=font(20, True), fill=NAVY)
     d.text((105, 1090), "THE GAME, IN FIVE STORIES  /  SWIPE →", font=font(24, True), fill=BLUE)
     path = directory / "slide-1.jpg"
     save_slide(im, path)
@@ -172,7 +172,7 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
         title_lines = wrap(d, article["title"], font(headline_size, True), 850)[:5]
         y = 500
         for line in title_lines:
-            d.text((78, y), line, font=font(headline_size, True), fill=WHITE)
+            d.text((78, y), line, font=font(headline_size, True), fill=NAVY)
             y += headline_size + 18
         summary = article["summary"] or "The latest development—follow the story as it unfolds."
         summary_lines = wrap(d, summary, font(28), 820)[:5]
