@@ -107,6 +107,29 @@ def wrap(draw, text: str, f, width: int) -> list[str]:
     return result
 
 
+
+def fit_text(draw, text: str, max_width: int, max_lines: int, start_size: int, min_size: int = 26, bold: bool = True) -> tuple[object, list[str]]:
+    """Choose a readable font size and wrap text within a fixed editorial text box.
+
+    If the text still exceeds the line budget at min_size, trim the final line
+    with an ellipsis rather than drawing outside the slide's content area.
+    """
+    text = clean_text(text)
+    for size in range(start_size, min_size - 1, -2):
+        f = font(size, bold)
+        lines = wrap(draw, text, f, max_width)
+        if len(lines) <= max_lines:
+            return f, lines
+    f = font(min_size, bold)
+    lines = wrap(draw, text, f, max_width)[:max_lines]
+    if not lines:
+        return f, []
+    last = lines[-1]
+    while last and draw.textbbox((0, 0), last + "…", font=f)[2] > max_width:
+        last = last[:-1]
+    lines[-1] = last.rstrip() + "…"
+    return f, lines
+
 def gradient_background():
     im = Image.new("RGB", SIZE, NAVY)
     pix = im.load()
@@ -152,11 +175,12 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
     d.text((102, 555), "Five stories shaping the game today.", font=font(27), fill=NAVY)
     d.rounded_rectangle((100, 635, 980, 1055), radius=25, fill=(247, 241, 230), outline=ORANGE, width=2)
     for i, article in enumerate(articles, 1):
-        y = 675 + (i - 1) * 76
+        y = 670 + (i - 1) * 78
         d.ellipse((130, y, 180, y + 50), fill=TEAL)
         d.text((146, y + 8), str(i), font=font(24, True), fill=WHITE)
-        lines = wrap(d, article["title"], font(20, True), 735)
-        d.text((205, y + 5), lines[0][:90], font=font(20, True), fill=NAVY)
+        title_font, title_lines = fit_text(d, article["title"], 735, 2, 21, 17, True)
+        for line_no, line in enumerate(title_lines):
+            d.text((205, y + 2 + line_no * 25), line, font=title_font, fill=NAVY)
     d.text((105, 1090), "THE GAME, IN FIVE STORIES  /  SWIPE →", font=font(24, True), fill=BLUE)
     path = directory / "slide-1.jpg"
     save_slide(im, path)
@@ -167,25 +191,30 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
         d.rectangle((68, 205, 1012, 310), fill=(232, 220, 199))
         d.text((100, 238), f"THE DAILY EDITION   /   STORY {index:02d}", font=font(25, True), fill=BLUE)
         d.text((72, 350), f"0{index}", font=font(110, True), fill=BLUE)
-        # Headline size adapts to its length to avoid clipping.
-        headline_size = 48 if len(article["title"]) < 78 else 39
-        title_lines = wrap(d, article["title"], font(headline_size, True), 850)[:5]
-        y = 500
+
+        # Keep headlines inside a reserved region and scale before trimming.
+        title_font, title_lines = fit_text(d, article["title"], 850, 5, 48, 34, True)
+        title_y = 500
+        title_spacing = title_font.size + 16
         for line in title_lines:
-            d.text((78, y), line, font=font(headline_size, True), fill=NAVY)
-            y += headline_size + 18
-        summary = article["summary"] or "The latest development—follow the story as it unfolds."
-        summary_lines = wrap(d, summary, font(28), 820)[:5]
-        panel_top = max(y + 28, 820)
-        panel_bottom = min(panel_top + 330, 1170)
+            d.text((78, title_y), line, font=title_font, fill=NAVY)
+            title_y += title_spacing
+
+        # The summary panel is anchored to the slide grid; its text has its own
+        # line budget so lengthy RSS descriptions cannot spill past the footer.
+        panel_top = max(820, min(title_y + 24, 850))
+        panel_bottom = 1165
         d.rounded_rectangle((72, panel_top, 1008, panel_bottom), radius=26, fill=(247, 241, 230), outline=ORANGE, width=2)
         d.text((105, panel_top + 28), "THE STORY", font=font(21, True), fill=BLUE)
+        summary = article.get("summary", "").strip() or "The latest development—follow the story as it unfolds."
+        summary_font, summary_lines = fit_text(d, summary, 820, 5, 27, 23, False)
         sy = panel_top + 75
+        line_height = summary_font.size + 13
         for line in summary_lines:
-            if sy + 38 > panel_bottom - 20:
+            if sy + line_height > panel_bottom - 18:
                 break
-            d.text((105, sy), line, font=font(27), fill=MUTED)
-            sy += 45
+            d.text((105, sy), line, font=summary_font, fill=MUTED)
+            sy += line_height
         d.text((78, 1190), "NEXZENCRICINFO  •  CRICKET, CONSIDERED", font=font(19, True), fill=BLUE)
         path = directory / f"slide-{index + 1}.jpg"
         save_slide(im, path)
