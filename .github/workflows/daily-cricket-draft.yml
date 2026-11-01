@@ -7,11 +7,14 @@ on:
     - cron: "0 16 * * *" # 9:30 PM IST
   workflow_dispatch:
     inputs:
-      force_publish:
-        description: "Publish again even if this slot was already published (urgent news)"
-        required: false
-        type: boolean
-        default: false
+      publishing_mode:
+        description: "Choose regular scheduled-style coverage or a breaking-news update"
+        required: true
+        type: choice
+        options:
+          - regular
+          - breaking_news
+        default: regular
 
 permissions:
   contents: write
@@ -68,6 +71,7 @@ jobs:
       - name: Generate engaging cricket carousel
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
+          PUBLISHING_MODE: ${{ inputs.publishing_mode || 'regular' }}
           OPENCRICKET_API_KEY: ${{ secrets.OPENCRICKET_API_KEY }}
         run: python cricket_agent.py
       - name: Commit generated draft and images
@@ -90,7 +94,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           POST_SLOT: ${{ steps.slot.outputs.slot }}
-          FORCE_PUBLISH: ${{ inputs.force_publish || false }}
+          FORCE_PUBLISH: ${{ inputs.publishing_mode == 'breaking_news' }}
         run: python publish_instagram.py
       - name: Remove published carousel images from repository
         if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.instagram.outputs.status == 'published'
