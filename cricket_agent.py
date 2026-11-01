@@ -19,14 +19,14 @@ IST = ZoneInfo("Asia/Kolkata")
 NEWS_FEED = "https://news.google.com/rss/search?q=cricket+(India+OR+IPL+OR+ICC+OR+Test+OR+ODI+OR+T20)&hl=en-IN&gl=IN&ceid=IN:en"
 MAX_ARTICLES = 5
 SIZE = (1080, 1350)
-NAVY = (35, 31, 32)       # Editorial charcoal
-PANEL = (250, 246, 239)   # Light editorial ivory
-BLUE = (105, 24, 42)      # Deep burgundy
-TEAL = (105, 24, 42)      # Burgundy brand accent
-ORANGE = (183, 145, 82)   # Restrained editorial gold
-GOLD = (183, 145, 82)     # Restrained editorial gold
-WHITE = (250, 246, 239)   # Ivory for dark panels only
-MUTED = (103, 91, 83)     # Readable warm grey
+NAVY = (12, 20, 54)       # Premium deep navy
+PANEL = (22, 39, 92)       # Royal-blue panel
+BLUE = (35, 116, 245)      # Brand blue
+TEAL = (0, 214, 232)       # Cyan accent
+ORANGE = (245, 190, 75)    # Restrained gold highlight
+GOLD = (245, 190, 75)
+WHITE = (255, 255, 255)
+MUTED = (203, 218, 246)    # High-contrast pale blue
 
 
 def clean_text(value: str) -> str:
@@ -156,11 +156,17 @@ def fit_text(draw, text: str, max_width: int, max_lines: int, start_size: int, m
     return f, lines
 
 def gradient_background():
+    """Create the brand's navy-to-royal-blue-to-violet sports gradient."""
     im = Image.new("RGB", SIZE, NAVY)
     pix = im.load()
+    stops = [(0.0, (8, 18, 55)), (0.52, (25, 76, 190)), (1.0, (104, 42, 190))]
     for y in range(SIZE[1]):
-        blend = y / SIZE[1]
-        color = tuple(int(NAVY[i] * (1 - blend) + PANEL[i] * blend) for i in range(3))
+        t = y / max(1, SIZE[1] - 1)
+        for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+            if t0 <= t <= t1:
+                q = (t - t0) / (t1 - t0)
+                color = tuple(int(c0[k] * (1-q) + c1[k] * q) for k in range(3))
+                break
         for x in range(SIZE[0]):
             pix[x, y] = color
     return im
@@ -169,18 +175,13 @@ def gradient_background():
 def base_slide(slide_no: int, date: str):
     im = gradient_background()
     d = ImageDraw.Draw(im)
-    d.rectangle((0, 0, 1080, 1350), fill=PANEL)
-    d.rectangle((0, 0, 14, 1350), fill=BLUE)
-    d.rectangle((1066, 0, 1080, 1350), fill=BLUE)
-    d.rectangle((42, 36, 1038, 1314), outline=ORANGE, width=2)
-    # Restrained magazine-style corner motifs; keep the text area clean.
-    d.line((850, 38, 1038, 226), fill=(232, 220, 199), width=5)
-    d.line((42, 1124, 230, 1312), fill=(232, 220, 199), width=5)
-    d.text((66, 58), "NEXZENCRICINFO", font=font(31, True), fill=TEAL)
-    d.text((68, 108), "THE CRICKET JOURNAL  /  NEWS & INSIGHT", font=font(18, True), fill=MUTED)
-    d.line((68, 160, 1012, 160), fill=ORANGE, width=2)
-    d.text((68, 1263), "FOLLOW @NEXZENCRICINFO", font=font(19, True), fill=TEAL)
-    d.text((855, 1261), f"{slide_no}/6  •  {date}", font=font(17, True), fill=MUTED)
+    # Modern sports-media frame with subtle cyan edge and clear brand header.
+    d.rectangle((24, 24, 1056, 1326), outline=TEAL, width=3)
+    d.text((62, 48), "NEXZENCRICINFO", font=font(32, True), fill=WHITE)
+    d.text((64, 96), "NEXT GEN CRICKET  /  NEWS • RECORDS • INSIGHT", font=font(18, True), fill=MUTED)
+    d.line((62, 145, 1018, 145), fill=TEAL, width=3)
+    d.text((62, 1270), "@NEXZENCRICINFO", font=font(20, True), fill=WHITE)
+    d.text((850, 1270), f"{slide_no}/6  •  {date}", font=font(18, True), fill=MUTED)
     return im, d
 
 
@@ -237,58 +238,57 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
     paths = []
     # Cover slide with stronger hierarchy and a compact story rundown.
     im, d = base_slide(1, date)
-    d.rectangle((68, 210, 1012, 1150), fill=(239, 230, 214), outline=ORANGE, width=2)
+    d.rounded_rectangle((55, 190, 1025, 1165), radius=32, fill=PANEL, outline=TEAL, width=3)
     if articles:
-        place_photo(im, articles[0], (68, 210, 1012, 620), overlay=105)
-    d.text((100, 260), "THE DAILY EDITION", font=font(36, True), fill=WHITE)
-    d.text((95, 325), "CRICKET", font=font(100, True), fill=WHITE)
-    d.text((95, 430), "JOURNAL", font=font(92, True), fill=WHITE)
-    d.text((102, 555), "Five stories shaping the game today.", font=font(27), fill=WHITE)
-    d.rounded_rectangle((100, 635, 980, 1055), radius=25, fill=(247, 241, 230), outline=ORANGE, width=2)
+        place_photo(im, articles[0], (62, 198, 1018, 620), overlay=65)
+    d.text((100, 250), "THE DAILY CRICKET", font=font(36, True), fill=TEAL)
+    d.text((95, 315), "TOP 5", font=font(112, True), fill=WHITE)
+    d.text((100, 450), "CRICKET STORIES", font=font(66, True), fill=WHITE)
+    d.text((102, 555), "The moments shaping the game today.", font=font(27, True), fill=MUTED)
+    d.rounded_rectangle((100, 635, 980, 1055), radius=25, fill=(12, 25, 70), outline=TEAL, width=2)
     for i, article in enumerate(articles, 1):
         y = 670 + (i - 1) * 78
-        d.ellipse((130, y, 180, y + 50), fill=TEAL)
+        d.ellipse((130, y, 180, y + 50), fill=BLUE)
         d.text((146, y + 8), str(i), font=font(24, True), fill=WHITE)
         title_font, title_lines = fit_text(d, article["title"], 735, 2, 21, 17, True)
         for line_no, line in enumerate(title_lines):
-            d.text((205, y + 2 + line_no * 25), line, font=title_font, fill=NAVY)
-    d.text((105, 1090), "THE GAME, IN FIVE STORIES  /  SWIPE →", font=font(24, True), fill=BLUE)
+            d.text((205, y + 2 + line_no * 25), line, font=title_font, fill=WHITE)
+    d.text((105, 1090), "THE GAME, IN FIVE STORIES  /  SWIPE →", font=font(24, True), fill=TEAL)
     path = directory / "slide-1.jpg"
     save_slide(im, path)
     paths.append(path)
 
     for index, article in enumerate(articles, 1):
         im, d = base_slide(index + 1, date)
-        d.rectangle((68, 205, 1012, 310), fill=(232, 220, 199))
-        d.text((100, 238), f"THE DAILY EDITION   /   STORY {index:02d}", font=font(25, True), fill=BLUE)
-        photo_ok = place_photo(im, article, (72, 330, 1008, 760), overlay=115)
+        d.rounded_rectangle((58, 185, 1022, 1165), radius=28, fill=(13, 28, 75), outline=TEAL, width=3)
+        d.text((88, 215), f"DAILY CRICKET  /  STORY {index:02d}", font=font(25, True), fill=TEAL)
+        photo_ok = place_photo(im, article, (78, 275, 1002, 735), overlay=48)
         if not photo_ok:
-            d.rectangle((72, 330, 1008, 760), fill=(239, 230, 214), outline=ORANGE, width=2)
-            d.text((110, 520), "THE CRICKET JOURNAL", font=font(42, True), fill=BLUE)
-        # Headline appears over a photo-led frame with editorial contrast.
-        title_font, title_lines = fit_text(d, article["title"], 850, 4, 46, 32, True)
-        title_y = 785
+            raise RuntimeError(f"Missing usable cricket photo for story: {article.get('title', '')}")
+        # Photo-led design with strong readable headline beneath the image.
+        title_font, title_lines = fit_text(d, article["title"], 850, 4, 48, 32, True)
+        title_y = 760
         title_spacing = title_font.size + 16
         for line in title_lines:
-            d.text((78, title_y), line, font=title_font, fill=NAVY)
+            d.text((78, title_y), line, font=title_font, fill=WHITE)
             title_y += title_spacing
 
         # The summary panel is anchored to the slide grid; its text has its own
         # line budget so lengthy RSS descriptions cannot spill past the footer.
         panel_top = max(820, min(title_y + 24, 850))
         panel_bottom = 1165
-        d.rounded_rectangle((72, panel_top, 1008, panel_bottom), radius=26, fill=(247, 241, 230), outline=ORANGE, width=2)
-        d.text((105, panel_top + 28), "THE STORY", font=font(21, True), fill=BLUE)
-        summary = article.get("summary", "").strip() or "The latest development—follow the story as it unfolds."
+        d.rounded_rectangle((72, panel_top, 1008, panel_bottom), radius=26, fill=(20, 43, 108), outline=TEAL, width=2)
+        d.text((105, panel_top + 28), "THE STORY", font=font(21, True), fill=TEAL)
+        summary = article.get("summary", "").strip() or "A key cricket update. Follow the verified story as it unfolds."
         summary_font, summary_lines = fit_text(d, summary, 820, 5, 27, 23, False)
         sy = panel_top + 75
         line_height = summary_font.size + 13
         for line in summary_lines:
             if sy + line_height > panel_bottom - 18:
                 break
-            d.text((105, sy), line, font=summary_font, fill=MUTED)
+            d.text((105, sy), line, font=summary_font, fill=WHITE)
             sy += line_height
-        d.text((78, 1190), "NEXZENCRICINFO  •  CRICKET, CONSIDERED", font=font(19, True), fill=BLUE)
+        d.text((78, 1190), "NEXZENCRICINFO  •  NEXT GEN CRICKET", font=font(19, True), fill=TEAL)
         path = directory / f"slide-{index + 1}.jpg"
         save_slide(im, path)
         paths.append(path)
