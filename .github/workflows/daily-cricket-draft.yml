@@ -6,6 +6,15 @@ on:
     - cron: "0 11 * * *" # 4:30 PM IST
     - cron: "0 16 * * *" # 9:30 PM IST
   workflow_dispatch:
+    inputs:
+      publishing_mode:
+        description: "Choose regular scheduled-style coverage or a breaking-news update"
+        required: true
+        type: choice
+        options:
+          - regular
+          - breaking_news
+        default: regular
 
 permissions:
   contents: write
@@ -47,9 +56,22 @@ jobs:
           echo "Publishing slot: $SLOT"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Clean existing images for this slot
+        env:
+          POST_SLOT: ${{ steps.slot.outputs.slot }}
+        run: |
+          TODAY=$(TZ=Asia/Kolkata date +%F)
+          DIR="images/$TODAY/$POST_SLOT"
+          if [ -d "$DIR" ]; then
+            rm -rf "$DIR"
+            echo "Removed old generated images from $DIR"
+          else
+            echo "No old images found in $DIR"
+          fi
       - name: Generate engaging cricket carousel
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
+          PUBLISHING_MODE: ${{ inputs.publishing_mode || 'regular' }}
           OPENCRICKET_API_KEY: ${{ secrets.OPENCRICKET_API_KEY }}
         run: python cricket_agent.py
       - name: Commit generated draft and images
@@ -72,6 +94,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           POST_SLOT: ${{ steps.slot.outputs.slot }}
+          FORCE_PUBLISH: ${{ inputs.publishing_mode == 'breaking_news' }}
         run: python publish_instagram.py
       - name: Remove published carousel images from repository
         if: vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.instagram.outputs.status == 'published'
