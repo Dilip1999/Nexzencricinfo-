@@ -92,10 +92,13 @@ def main() -> None:
 
     state = json.loads(STATE_FILE.read_text(encoding="utf-8")) if STATE_FILE.exists() else {"published_dates": {}}
     published_slots = state.setdefault("published_dates", {})
-    if slot_key in published_slots:
+    force_publish = os.getenv("FORCE_PUBLISH", "false").strip().lower() == "true"
+    if slot_key in published_slots and not force_publish:
         print(f"Already published slot {slot_key}; skipping duplicate.")
         set_github_output("status", "skipped")
         return
+    if slot_key in published_slots and force_publish:
+        print(f"Breaking-news mode enabled for {slot_key}; allowing a fresh publication.")
 
     slide_dir = Path("images") / today / slot
     slide_paths = [slide_dir / f"slide-{i}.jpg" for i in range(1, 7)]
