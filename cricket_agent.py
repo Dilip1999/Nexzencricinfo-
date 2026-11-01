@@ -62,6 +62,53 @@ def is_excluded_story(article: dict[str, str]) -> bool:
     return bool(EXCLUDED_COUNTRY_RE.search(clean_text(text)))
 
 
+
+def extract_image_urls(entry) -> list[str]:
+    """Collect image URLs from common RSS media/enclosure/content fields."""
+    urls = []
+    for field in ("media_thumbnail", "media_content", "enclosures"):
+        values = entry.get(field, []) or []
+        if isinstance(values, dict):
+            values = [values]
+        for item in values:
+            if isinstance(item, dict):
+                url = str(item.get("url") or item.get("href") or "").strip()
+                mime = str(item.get("type") or "").lower()
+                if url and (not mime or mime.startswith("image/")):
+                    urls.append(url)
+    for field in ("image", "thumbnail"):
+        item = entry.get(field)
+        if isinstance(item, dict):
+            url = str(item.get("href") or item.get("url") or "").strip()
+            if url:
+                urls.append(url)
+    # Google News frequently includes image links in the HTML description.
+    html_blob = " ".join(str(entry.get(field, "")) for field in ("summary", "content"))
+    for match in re.findall(r'<img[^>]+(?:src|data-src)=[\"\']([^\"\']+)', html_blob, re.IGNORECASE):
+        if match.startswith(("https://", "http://")):
+            urls.append(html.unescape(match))
+    # Deduplicate while preserving source order.
+    return list(dict.fromkeys(urls))
+
+
+def image_url_is_usable(url: str) -> bool:
+    """Validate that a URL returns a decodable, adequately sized image."""
+    if not url.startswith(("https://", "http://")):
+        return False
+    try:
+        request = Request(url, headers={"User-Agent": "NexZenCricInfo/1.0 (editorial image fetch)"})
+        with urlopen(request, timeout=8) as response:
+            if not response.headers.get("Content-Type", "").lower().startswith("image/"):
+                return False
+            data = response.read(8 * 1024 * 1024 + 1)
+        if len(data) > 8 * 1024 * 1024:
+            return False
+        with Image.open(BytesIO(data)) as im:
+            width, height = im.size
+            return width >= 480 and height >= 260 and im.format in {"JPEG", "PNG", "WEBP"}
+    except Exception:
+        return False
+
 def fetch_articles() -> list[dict[str, str]]:
     """Combine fresh OpenCricket match data with Google News RSS."""
     history_path = Path("content_history.json")
@@ -91,15 +138,25 @@ def fetch_articles() -> list[dict[str, str]]:
         title = clean_text(str(entry.get("title", "")))
         url = str(entry.get("link", "")).strip()
         key = story_key(title)
+        image_candidates = extract_image_urls(entry)
         article = {"title": title, "url": url,
                    "summary": clean_summary(str(entry.get("summary", "")), title),
-                   "source": "Google News RSS"}
+                   "source": "Google News RSS",
+                   "image_candidates": image_candidates}
         if is_excluded_story(article):
             excluded_count += 1
             print(f"Excluded restricted-country RSS story: {title}")
             continue
         if not title or not url or key in seen or key in previously_used:
             continue
+        # Use only a real, decodable, adequately sized photo from the feed.
+        # Try candidates in source order; reject the story if none pass validation.
+        valid_image = next((candidate for candidate in image_candidates
+                            if image_url_is_usable(candidate)), "")
+        if not valid_image:
+            print(f"Skipping story without a usable photo: {title}")
+            continue
+        article["image_url"] = valid_image
         seen.add(key)
         items.append(article)
         if len(items) >= MAX_ARTICLES:
@@ -191,36 +248,39 @@ def save_slide(im, path: Path):
 
 
 def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image | None:
-    """Download and crop a feed-supplied cricket image; fail closed if unusable."""
-    url = article.get("image_url", "").strip()
-    if not url.startswith(("https://", "http://")):
-        return None
-    try:
-        request = Request(url, headers={"User-Agent": "NexZenCricInfo/1.0 (editorial image fetch)"})
-        with urlopen(request, timeout=8) as response:
-            if not response.headers.get("Content-Type", "").startswith("image/"):
-                return None
-            data = response.read(8 * 1024 * 1024 + 1)
-        if len(data) > 8 * 1024 * 1024:
-            return None
-        with Image.open(BytesIO(data)) as source:
-            photo = source.convert("RGB")
-            photo.thumbnail((size[0] * 2, size[1] * 2), Image.Resampling.LANCZOS)
-            target_ratio = size[0] / size[1]
-            ratio = photo.width / photo.height
-            if ratio > target_ratio:
-                new_width = int(photo.height * target_ratio)
-                left = (photo.width - new_width) // 2
-                photo = photo.crop((left, 0, left + new_width, photo.height))
-            else:
-                new_height = int(photo.width / target_ratio)
-                top = (photo.height - new_height) // 2
-                photo = photo.crop((0, top, photo.width, top + new_height))
-            return photo.resize(size, Image.Resampling.LANCZOS)
-    except Exception as exc:
-        print(f"Skipping unusable article image ({type(exc).__name__}).")
-        return None
-
+    """Try feed image candidates and return the first usable cropped photo."""
+    urls = [article.get("image_url", "").strip()]
+    urls.extend(article.get("image_candidates", []))
+    for url in dict.fromkeys(urls):
+        if not url.startswith(("https://", "http://")):
+            continue
+        try:
+            request = Request(url, headers={"User-Agent": "NexZenCricInfo/1.0 (editorial image fetch)"})
+            with urlopen(request, timeout=8) as response:
+                if not response.headers.get("Content-Type", "").lower().startswith("image/"):
+                    continue
+                data = response.read(8 * 1024 * 1024 + 1)
+            if len(data) > 8 * 1024 * 1024:
+                continue
+            with Image.open(BytesIO(data)) as source:
+                photo = source.convert("RGB")
+                if photo.width < 480 or photo.height < 260:
+                    continue
+                photo.thumbnail((size[0] * 2, size[1] * 2), Image.Resampling.LANCZOS)
+                target_ratio = size[0] / size[1]
+                ratio = photo.width / photo.height
+                if ratio > target_ratio:
+                    new_width = int(photo.height * target_ratio)
+                    left = (photo.width - new_width) // 2
+                    photo = photo.crop((left, 0, left + new_width, photo.height))
+                else:
+                    new_height = int(photo.width / target_ratio)
+                    top = (photo.height - new_height) // 2
+                    photo = photo.crop((0, top, photo.width, top + new_height))
+                return photo.resize(size, Image.Resampling.LANCZOS)
+        except Exception as exc:
+            print(f"Skipping unusable article image ({type(exc).__name__}).")
+    return None
 
 def place_photo(im: Image.Image, article: dict[str, str], bounds: tuple[int, int, int, int], overlay: int = 75) -> bool:
     """Place an image in a fixed editorial frame with a subtle dark veil."""
