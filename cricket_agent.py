@@ -8,6 +8,7 @@ import re
 from html.parser import HTMLParser
 from io import BytesIO
 from urllib.request import Request, urlopen
+from urllib.parse import urljoin
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -110,27 +111,36 @@ def image_url_is_usable(url: str) -> bool:
     except Exception:
         return False
 
-class _ImageMetaParser(HTMLParser):
-    """Read common social-preview image metadata from an article page."""
+class _ArticleImageParser(HTMLParser):
+    """Collect social-preview and embedded image URLs from publisher HTML."""
 
     def __init__(self):
         super().__init__()
         self.image_urls = []
 
     def handle_starttag(self, tag, attrs):
-        if tag.lower() != "meta":
-            return
         values = {str(key).lower(): str(value or "").strip()
                   for key, value in attrs if key}
-        prop = (values.get("property") or values.get("name") or "").lower()
-        content = values.get("content", "")
-        if content and prop in {"og:image", "og:image:url", "twitter:image",
-                                "twitter:image:src"}:
-            self.image_urls.append(content)
+        if tag.lower() == "meta":
+            prop = (values.get("property") or values.get("name") or "").lower()
+            content = values.get("content", "")
+            if content and prop in {"og:image", "og:image:url", "twitter:image",
+                                    "twitter:image:src"}:
+                self.image_urls.append(content)
+        elif tag.lower() in {"img", "source"}:
+            for field in ("src", "data-src", "data-original", "data-lazy-src"):
+                if values.get(field):
+                    self.image_urls.append(values[field])
+            # Responsive image sets often contain the largest usable image.
+            srcset = values.get("srcset") or values.get("data-srcset", "")
+            for entry in srcset.split(","):
+                candidate = entry.strip().split()
+                if candidate:
+                    self.image_urls.append(candidate[0])
 
 
 def extract_page_image_url(article_url: str) -> str:
-    """Try publisher Open Graph/Twitter metadata when RSS has no usable photo."""
+    """Find a real usable image in publisher social metadata or page markup."""
     if not article_url.startswith(("https://", "http://")):
         return ""
     try:
@@ -142,17 +152,25 @@ def extract_page_image_url(article_url: str) -> str:
             content_type = response.headers.get("Content-Type", "").lower()
             if "text/html" not in content_type:
                 return ""
-            page = response.read(1024 * 1024).decode("utf-8", errors="replace")
-        parser = _ImageMetaParser()
+            page = response.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
+            page_url = response.geturl()
+        parser = _ArticleImageParser()
         parser.feed(page)
-        for candidate in parser.image_urls:
-            candidate = html.unescape(candidate).strip()
+        candidates = []
+        for raw in parser.image_urls:
+            candidate = html.unescape(raw).strip()
             if candidate.startswith("//"):
                 candidate = "https:" + candidate
-            if candidate.startswith(("https://", "http://")) and image_url_is_usable(candidate):
+            candidate = urljoin(page_url, candidate)
+            if candidate.startswith(("https://", "http://")):
+                candidates.append(candidate)
+        # Check candidates one at a time, with de-duplication and existing
+        # dimension/format/size validation. Do not substitute placeholders.
+        for candidate in dict.fromkeys(candidates):
+            if image_url_is_usable(candidate):
                 return candidate
     except Exception as exc:
-        print(f"Could not inspect publisher image metadata ({type(exc).__name__}).")
+        print(f"Could not inspect publisher image markup ({type(exc).__name__}).")
     return ""
 
 
@@ -173,11 +191,24 @@ def fetch_articles() -> list[dict[str, str]]:
                 print(f"Excluded restricted-country story: {article.get('title', '')}")
                 continue
             key = story_key(article["title"])
-            if key and key not in previously_used and key not in seen:
-                seen.add(key)
-                items.append(article)
-                if len(items) >= MAX_ARTICLES:
-                    break
+            if not key or key in previously_used or key in seen:
+                continue
+            # API match records may not include photos; use the same photo gate
+            # as RSS and discover one from the source page when possible.
+            api_candidates = [str(article.get("image_url") or "").strip()]
+            api_candidates.extend(article.get("image_candidates", []))
+            valid_image = next((candidate for candidate in api_candidates
+                                if candidate and image_url_is_usable(candidate)), "")
+            if not valid_image:
+                valid_image = extract_page_image_url(str(article.get("url") or ""))
+            if not valid_image:
+                print(f"Skipping OpenCricket story without a usable photo: {article.get('title', '')}")
+                continue
+            article["image_url"] = valid_image
+            seen.add(key)
+            items.append(article)
+            if len(items) >= MAX_ARTICLES:
+                break
     except Exception as exc:
         print(f"OpenCricket API unavailable; using RSS fallback ({type(exc).__name__}).")
     feed = feedparser.parse(NEWS_FEED)
