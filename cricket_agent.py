@@ -5,6 +5,7 @@ import html
 import json
 import os
 import re
+from html.parser import HTMLParser
 from io import BytesIO
 from urllib.request import Request, urlopen
 from datetime import datetime, timezone
@@ -109,6 +110,52 @@ def image_url_is_usable(url: str) -> bool:
     except Exception:
         return False
 
+class _ImageMetaParser(HTMLParser):
+    """Read common social-preview image metadata from an article page."""
+
+    def __init__(self):
+        super().__init__()
+        self.image_urls = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "meta":
+            return
+        values = {str(key).lower(): str(value or "").strip()
+                  for key, value in attrs if key}
+        prop = (values.get("property") or values.get("name") or "").lower()
+        content = values.get("content", "")
+        if content and prop in {"og:image", "og:image:url", "twitter:image",
+                                "twitter:image:src"}:
+            self.image_urls.append(content)
+
+
+def extract_page_image_url(article_url: str) -> str:
+    """Try publisher Open Graph/Twitter metadata when RSS has no usable photo."""
+    if not article_url.startswith(("https://", "http://")):
+        return ""
+    try:
+        request = Request(
+            article_url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; NexZenCricInfo/1.0; +https://github.com/Dilip1999/Nexzencricinfo-)"},
+        )
+        with urlopen(request, timeout=10) as response:
+            content_type = response.headers.get("Content-Type", "").lower()
+            if "text/html" not in content_type:
+                return ""
+            page = response.read(1024 * 1024).decode("utf-8", errors="replace")
+        parser = _ImageMetaParser()
+        parser.feed(page)
+        for candidate in parser.image_urls:
+            candidate = html.unescape(candidate).strip()
+            if candidate.startswith("//"):
+                candidate = "https:" + candidate
+            if candidate.startswith(("https://", "http://")) and image_url_is_usable(candidate):
+                return candidate
+    except Exception as exc:
+        print(f"Could not inspect publisher image metadata ({type(exc).__name__}).")
+    return ""
+
+
 def fetch_articles() -> list[dict[str, str]]:
     """Combine fresh OpenCricket match data with Google News RSS."""
     history_path = Path("content_history.json")
@@ -149,12 +196,14 @@ def fetch_articles() -> list[dict[str, str]]:
             continue
         if not title or not url or key in seen or key in previously_used:
             continue
-        # Use only a real, decodable, adequately sized photo from the feed.
-        # Try candidates in source order; reject the story if none pass validation.
+        # First validate RSS image candidates. If RSS omits a usable image,
+        # inspect publisher social-preview metadata (og:image / twitter:image).
         valid_image = next((candidate for candidate in image_candidates
                             if image_url_is_usable(candidate)), "")
         if not valid_image:
-            print(f"Skipping story without a usable photo: {title}")
+            valid_image = extract_page_image_url(url)
+        if not valid_image:
+            print(f"Skipping story without a usable photo after RSS and page metadata: {title}")
             continue
         article["image_url"] = valid_image
         seen.add(key)
