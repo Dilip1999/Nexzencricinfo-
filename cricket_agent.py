@@ -248,7 +248,7 @@ def save_slide(im, path: Path):
 
 
 def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image | None:
-    """Download and crop a feed-supplied cricket image; fail closed if unusable."""
+    """Try feed image candidates and return the first usable cropped photo."""
     urls = [article.get("image_url", "").strip()]
     urls.extend(article.get("image_candidates", []))
     for url in dict.fromkeys(urls):
@@ -262,26 +262,25 @@ def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image |
                 data = response.read(8 * 1024 * 1024 + 1)
             if len(data) > 8 * 1024 * 1024:
                 continue
-        with Image.open(BytesIO(data)) as source:
-            photo = source.convert("RGB")
-            photo.thumbnail((size[0] * 2, size[1] * 2), Image.Resampling.LANCZOS)
-            target_ratio = size[0] / size[1]
-            ratio = photo.width / photo.height
-            if ratio > target_ratio:
-                new_width = int(photo.height * target_ratio)
-                left = (photo.width - new_width) // 2
-                photo = photo.crop((left, 0, left + new_width, photo.height))
-            else:
-                new_height = int(photo.width / target_ratio)
-                top = (photo.height - new_height) // 2
-                photo = photo.crop((0, top, photo.width, top + new_height))
-            if photo.width < 1 or photo.height < 1:
-                continue
-            return photo.resize(size, Image.Resampling.LANCZOS)
+            with Image.open(BytesIO(data)) as source:
+                photo = source.convert("RGB")
+                if photo.width < 480 or photo.height < 260:
+                    continue
+                photo.thumbnail((size[0] * 2, size[1] * 2), Image.Resampling.LANCZOS)
+                target_ratio = size[0] / size[1]
+                ratio = photo.width / photo.height
+                if ratio > target_ratio:
+                    new_width = int(photo.height * target_ratio)
+                    left = (photo.width - new_width) // 2
+                    photo = photo.crop((left, 0, left + new_width, photo.height))
+                else:
+                    new_height = int(photo.width / target_ratio)
+                    top = (photo.height - new_height) // 2
+                    photo = photo.crop((0, top, photo.width, top + new_height))
+                return photo.resize(size, Image.Resampling.LANCZOS)
         except Exception as exc:
             print(f"Skipping unusable article image ({type(exc).__name__}).")
     return None
-
 
 def place_photo(im: Image.Image, article: dict[str, str], bounds: tuple[int, int, int, int], overlay: int = 75) -> bool:
     """Place an image in a fixed editorial frame with a subtle dark veil."""
