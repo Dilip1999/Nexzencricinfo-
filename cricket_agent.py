@@ -51,18 +51,6 @@ def story_key(title: str) -> str:
     return re.sub(r"\W+", " ", clean_text(title).lower()).strip()
 
 
-# Hard editorial exclusion: Pakistan and Bangladesh stories must not be published.
-EXCLUDED_COUNTRY_RE = re.compile(
-    r"\b(?:pakistan(?:i|is)?|bangladesh(?:i|is)?)\b", re.IGNORECASE
-)
-
-
-def is_excluded_story(article: dict[str, str]) -> bool:
-    """Reject restricted-country stories across headline, summary, and metadata."""
-    text = " ".join(str(article.get(field, "")) for field in
-                    ("title", "summary", "description", "content", "source"))
-    return bool(EXCLUDED_COUNTRY_RE.search(clean_text(text)))
-
 
 
 def extract_image_urls(entry) -> list[str]:
@@ -180,15 +168,10 @@ def fetch_articles() -> list[dict[str, str]]:
     history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {"stories": []}
     previously_used = {story_key(str(item.get("title", ""))) for item in history.get("stories", [])}
     items, seen = [], set()
-    excluded_count = 0
     try:
         for match in fetch_matches():
             article = match_to_article(match)
             if not article:
-                continue
-            if is_excluded_story(article):
-                excluded_count += 1
-                print(f"Excluded restricted-country story: {article.get('title', '')}")
                 continue
             key = story_key(article["title"])
             if not key or key in previously_used or key in seen:
@@ -221,10 +204,6 @@ def fetch_articles() -> list[dict[str, str]]:
                    "summary": clean_summary(str(entry.get("summary", "")), title),
                    "source": "Google News RSS",
                    "image_candidates": image_candidates}
-        if is_excluded_story(article):
-            excluded_count += 1
-            print(f"Excluded restricted-country RSS story: {title}")
-            continue
         if not title or not url or key in seen or key in previously_used:
             continue
         # First validate RSS image candidates. If RSS omits a usable image,
@@ -243,7 +222,7 @@ def fetch_articles() -> list[dict[str, str]]:
             break
     if not items:
         raise RuntimeError("No fresh cricket stories found from OpenCricket API or RSS.")
-    print(f"Selected {len(items)} eligible fresh stories; excluded {excluded_count} Pakistan/Bangladesh stories; history excludes {len(previously_used)} prior stories.")
+    print(f"Selected {len(items)} eligible fresh stories; history excludes {len(previously_used)} prior stories.")
     return items
 
 def font(size: int, bold: bool = False):
