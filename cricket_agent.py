@@ -82,21 +82,37 @@ def extract_image_urls(entry) -> list[str]:
 
 
 def image_url_is_usable(url: str) -> bool:
-    """Validate that a URL returns a decodable, adequately sized image."""
+    """Validate a candidate image and log why it was rejected."""
     if not url.startswith(("https://", "http://")):
+        print("Image candidate rejected: URL is not HTTP(S).")
         return False
+    # Keep logs concise: don't print potentially long signed query strings.
+    from urllib.parse import urlsplit
+    parsed = urlsplit(url)
+    label = f"{parsed.netloc}{parsed.path[:90]}"
     try:
-        request = Request(url, headers={"User-Agent": "NexZenCricInfo/1.0 (editorial image fetch)"})
+        request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NexZenCricInfo/1.0)"})
         with urlopen(request, timeout=8) as response:
-            if not response.headers.get("Content-Type", "").lower().startswith("image/"):
+            content_type = response.headers.get("Content-Type", "").lower().split(";")[0].strip()
+            if not content_type.startswith("image/"):
+                print(f"Image candidate rejected ({label}): content-type={content_type or 'missing'}.")
                 return False
             data = response.read(8 * 1024 * 1024 + 1)
         if len(data) > 8 * 1024 * 1024:
+            print(f"Image candidate rejected ({label}): exceeds 8 MiB limit.")
             return False
         with Image.open(BytesIO(data)) as im:
             width, height = im.size
-            return width >= 480 and height >= 260 and im.format in {"JPEG", "PNG", "WEBP"}
-    except Exception:
+            if im.format not in {"JPEG", "PNG", "WEBP"}:
+                print(f"Image candidate rejected ({label}): unsupported format={im.format}.")
+                return False
+            if width < 480 or height < 260:
+                print(f"Image candidate rejected ({label}): dimensions={width}x{height}, minimum is 480x260.")
+                return False
+            print(f"Image candidate accepted ({label}): {im.format} {width}x{height}.")
+            return True
+    except Exception as exc:
+        print(f"Image candidate rejected ({label}): {type(exc).__name__}: {str(exc)[:180]}")
         return False
 
 class _ArticleImageParser(HTMLParser):
@@ -444,7 +460,13 @@ def main():
     slot = os.getenv("POST_SLOT", "manual").strip().lower()
     if slot not in {"morning", "evening", "night", "manual"}:
         raise RuntimeError(f"Invalid POST_SLOT: {slot!r}")
-    articles = fetch_articles()
+    try:
+        articles = fetch_articles()
+    except RuntimeError as exc:
+        if "No fresh cricket stories found" in str(exc):
+            print("No eligible fresh cricket stories today; skipping carousel generation.")
+            return
+        raise
     caption = build_caption(articles, today)
     Path("drafts").mkdir(exist_ok=True)
     image_dir = Path("images") / today / slot
