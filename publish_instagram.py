@@ -119,6 +119,15 @@ def main() -> None:
             stories.append({"title": match.group(1).strip(), "url": match.group(2).strip(),
                             "slot": slot, "date": today})
 
+    # Fail closed: independent final check before any Instagram media upload.
+    restricted_country = re.compile(
+        r"\b(?:pakistan(?:i|is)?|bangladesh(?:i|is)?)\b", re.IGNORECASE
+    )
+    if restricted_country.search(caption) or any(
+        restricted_country.search(story["title"]) for story in stories
+    ):
+        raise RuntimeError("Publishing blocked: carousel contains Pakistan/Bangladesh news.")
+
     child_ids = []
     for index, path in enumerate(slide_paths, 1):
         image_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{path.as_posix()}"
