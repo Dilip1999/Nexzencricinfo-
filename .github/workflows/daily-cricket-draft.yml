@@ -81,7 +81,7 @@ jobs:
         run: |
           TODAY=$(TZ=Asia/Kolkata date +%F)
           DIR="images/$TODAY/$POST_SLOT"
-          DRAFT="drafts/$TODAY_$POST_SLOT.md"
+          DRAFT="drafts/${TODAY}_${POST_SLOT}.md"
           READY=true
 
           for i in 1 2 3 4 5 6; do
