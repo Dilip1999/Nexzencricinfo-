@@ -376,6 +376,23 @@ def fit_text(draw, text: str, max_width: int, max_lines: int, start_size: int, m
     lines[-1] = last.rstrip() + "…"
     return f, lines
 
+def fit_text_in_box(draw, text: str, max_width: int, max_height: int,
+                    start_size: int = 48, min_size: int = 22,
+                    line_spacing: int = 6, bold: bool = True):
+    """Fit every word of a headline inside a measured area without ellipsis."""
+    text = clean_text(text)
+    for size in range(start_size, min_size - 1, -2):
+        typeface = font(size, bold)
+        lines = wrap(draw, text, typeface, max_width)
+        total_height = len(lines) * (typeface.size + line_spacing) - line_spacing
+        if total_height <= max_height:
+            return typeface, lines
+    # Retain the complete headline at the smallest supported size as a final
+    # fallback. The 230px title region accommodates normal cricket headlines.
+    typeface = font(min_size, bold)
+    return typeface, wrap(draw, text, typeface, max_width)
+
+
 def gradient_background():
     """Create the brand's navy-to-royal-blue-to-violet sports gradient."""
     im = Image.new("RGB", SIZE, NAVY)
@@ -396,11 +413,11 @@ def gradient_background():
 def base_slide(slide_no: int, date: str):
     im = gradient_background()
     d = ImageDraw.Draw(im)
-    # Modern sports-media frame with subtle cyan edge and clear brand header.
+    # Consistent high-contrast cricket media frame and compact editorial header.
     d.rectangle((24, 24, 1056, 1326), outline=TEAL, width=3)
-    d.text((62, 48), "NEXZENCRICINFO", font=font(32, True), fill=WHITE)
-    d.text((64, 96), "NEXT GEN CRICKET  /  NEWS • RECORDS • INSIGHT", font=font(18, True), fill=MUTED)
-    d.line((62, 145, 1018, 145), fill=TEAL, width=3)
+    d.text((62, 42), "NEXZENCRICINFO", font=font(32, True), fill=WHITE)
+    d.text((62, 91), "NEXT GEN CRICKET  /  NEWS • RECORDS • INSIGHT", font=font(18, True), fill=MUTED)
+    d.line((62, 140, 1018, 140), fill=TEAL, width=3)
     d.text((62, 1270), "@NEXZENCRICINFO", font=font(20, True), fill=WHITE)
     d.text((850, 1270), f"{slide_no}/6  •  {date}", font=font(18, True), fill=MUTED)
     return im, d
@@ -451,76 +468,139 @@ def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image |
             print(f"Skipping unusable article image ({type(exc).__name__}).")
     return None
 
-def place_photo(im: Image.Image, article: dict[str, str], bounds: tuple[int, int, int, int], overlay: int = 75) -> bool:
-    """Place an image in a fixed editorial frame with a subtle dark veil."""
+def place_photo(im: Image.Image, article: dict[str, str], bounds: tuple[int, int, int, int], overlay: int = 0) -> bool:
+    """Place a bright, clear cricket photograph in a fixed editorial frame."""
     left, top, right, bottom = bounds
     photo = fetch_photo(article, (right - left, bottom - top))
     if photo is None:
         return False
-    veil = Image.new("RGBA", photo.size, (35, 31, 32, overlay))
-    photo = Image.alpha_composite(photo.convert("RGBA"), veil).convert("RGB")
+    if overlay > 0:
+        veil = Image.new("RGBA", photo.size, (5, 13, 30, overlay))
+        photo = Image.alpha_composite(photo.convert("RGBA"), veil).convert("RGB")
     im.paste(photo, (left, top))
     return True
 
 
+def apply_bottom_gradient(im: Image.Image, bounds: tuple[int, int, int, int],
+                          start_alpha: int = 0, end_alpha: int = 225) -> None:
+    """Add a smooth dark fade at a photo's lower edge so headlines remain legible."""
+    left, top, right, bottom = bounds
+    height = max(1, bottom - top)
+    layer = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    for offset in range(height):
+        progress = offset / max(1, height - 1)
+        alpha = int(start_alpha + (end_alpha - start_alpha) * progress)
+        draw.line((left, top + offset, right, top + offset),
+                  fill=(4, 15, 34, alpha), width=1)
+    im.alpha_composite(layer) if im.mode == "RGBA" else im.paste(
+        Image.alpha_composite(im.convert("RGBA"), layer).convert("RGB")
+    )
+
+
+def draw_centered_lines(draw, lines: list[str], typeface, center_x: int,
+                        top: int, fill, spacing: int = 8) -> int:
+    """Draw each line centered and return the y position after the final line."""
+    y = top
+    for line in lines:
+        bounds = draw.textbbox((0, 0), line, font=typeface)
+        width = bounds[2] - bounds[0]
+        draw.text((center_x - width // 2, y), line, font=typeface, fill=fill)
+        y += typeface.size + spacing
+    return y
+
+
 def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) -> list[Path]:
     paths = []
-    # Cover slide with stronger hierarchy and a compact story rundown.
+
+    # COVER: keep the cricketers as the hero. The title sits across the
+    # middle/lower part of the photograph, with no numbered headline list.
     im, d = base_slide(1, date)
-    d.rounded_rectangle((55, 190, 1025, 1165), radius=32, fill=PANEL, outline=TEAL, width=3)
+    cover_bounds = (62, 175, 1018, 900)
+    d.rounded_rectangle((50, 160, 1030, 1165), radius=30,
+                        fill=NAVY, outline=TEAL, width=3)
     if articles:
-        place_photo(im, articles[0], (62, 198, 1018, 620), overlay=65)
-    d.text((100, 250), "THE DAILY CRICKET", font=font(36, True), fill=TEAL)
-    d.text((95, 315), "TOP 5", font=font(112, True), fill=WHITE)
-    d.text((100, 450), "CRICKET STORIES", font=font(66, True), fill=WHITE)
-    d.text((102, 555), "The moments shaping the game today.", font=font(27, True), fill=MUTED)
-    d.rounded_rectangle((100, 635, 980, 1055), radius=25, fill=(12, 25, 70), outline=TEAL, width=2)
-    for i, article in enumerate(articles, 1):
-        y = 670 + (i - 1) * 78
-        d.ellipse((130, y, 180, y + 50), fill=BLUE)
-        d.text((146, y + 8), str(i), font=font(24, True), fill=WHITE)
-        title_font, title_lines = fit_text(d, article["title"], 735, 2, 21, 17, True)
-        for line_no, line in enumerate(title_lines):
-            d.text((205, y + 2 + line_no * 25), line, font=title_font, fill=WHITE)
-    d.text((105, 1090), "THE GAME, IN FIVE STORIES  /  SWIPE →", font=font(24, True), fill=TEAL)
+        if not place_photo(im, articles[0], cover_bounds, overlay=0):
+            raise RuntimeError("Could not place the cover cricket photograph.")
+    apply_bottom_gradient(im, (62, 590, 1018, 900), start_alpha=0, end_alpha=225)
+    d = ImageDraw.Draw(im)
+    d.rectangle((61, 174, 1019, 901), outline=TEAL, width=2)
+
+    d.text((540, 650), "THE DAILY CRICKET", font=font(30, True),
+           fill=TEAL, anchor="mm")
+    top_font = font(112, True)
+    second_font = font(68, True)
+    draw_centered_lines(d, ["TOP 5"], top_font, 540, 700, WHITE, spacing=0)
+    draw_centered_lines(d, ["CRICKET STORIES"], second_font, 540, 805, GOLD, spacing=0)
+
+    d.line((150, 975, 930, 975), fill=GOLD, width=3)
+    d.text((540, 1028), "THE BIGGEST CRICKET UPDATES OF THE DAY",
+           font=font(24, True), fill=MUTED, anchor="mm")
+    d.text((540, 1092), "SWIPE TO READ THE FIVE STORIES  →",
+           font=font(22, True), fill=TEAL, anchor="mm")
+
     path = directory / "slide-1.jpg"
     save_slide(im, path)
     paths.append(path)
 
+    # STORY SLIDES: large unobstructed photograph, then a dedicated headline
+    # area. The old "THE STORY" summary card is removed completely so it can
+    # never cover or clip a long headline.
     for index, article in enumerate(articles, 1):
         im, d = base_slide(index + 1, date)
-        d.rounded_rectangle((58, 185, 1022, 1165), radius=28, fill=(13, 28, 75), outline=TEAL, width=3)
-        d.text((88, 215), f"DAILY CRICKET  /  STORY {index:02d}", font=font(25, True), fill=TEAL)
-        photo_ok = place_photo(im, article, (78, 275, 1002, 735), overlay=48)
+        d.rounded_rectangle((55, 160, 1025, 1165), radius=28,
+                            fill=(13, 28, 75), outline=TEAL, width=3)
+
+        d.text((82, 195), "DAILY CRICKET", font=font(25, True), fill=TEAL)
+        d.text((330, 195), f"/  STORY {index:02d}  /  05",
+               font=font(25, True), fill=GOLD)
+        # Five small progress markers reinforce the carousel sequence.
+        marker_x = 820
+        for marker in range(5):
+            radius = 8
+            cx = marker_x + marker * 34
+            color = GOLD if marker == index - 1 else MUTED
+            d.ellipse((cx - radius, 188 - radius, cx + radius, 188 + radius),
+                      outline=color, fill=color if marker == index - 1 else None,
+                      width=2)
+
+        photo_bounds = (78, 245, 1002, 820)
+        photo_ok = place_photo(im, article, photo_bounds, overlay=0)
         if not photo_ok:
             raise RuntimeError(f"Missing usable cricket photo for story: {article.get('title', '')}")
-        # Photo-led design with strong readable headline beneath the image.
-        title_font, title_lines = fit_text(d, article["title"], 850, 4, 48, 32, True)
-        title_y = 760
-        title_spacing = title_font.size + 16
-        for line in title_lines:
-            d.text((78, title_y), line, font=title_font, fill=WHITE)
-            title_y += title_spacing
+        apply_bottom_gradient(im, (78, 625, 1002, 820),
+                              start_alpha=0, end_alpha=215)
+        d = ImageDraw.Draw(im)
+        d.rectangle((77, 244, 1003, 821), outline=TEAL, width=2)
 
-        # The summary panel is anchored to the slide grid; its text has its own
-        # line budget so lengthy RSS descriptions cannot spill past the footer.
-        panel_top = max(820, min(title_y + 24, 850))
-        panel_bottom = 1165
-        d.rounded_rectangle((72, panel_top, 1008, panel_bottom), radius=26, fill=(20, 43, 108), outline=TEAL, width=2)
-        d.text((105, panel_top + 28), "THE STORY", font=font(21, True), fill=TEAL)
-        summary = article.get("summary", "").strip() or "A key cricket update. Follow the verified story as it unfolds."
-        summary_font, summary_lines = fit_text(d, summary, 820, 5, 27, 23, False)
-        sy = panel_top + 75
-        line_height = summary_font.size + 13
-        for line in summary_lines:
-            if sy + line_height > panel_bottom - 18:
-                break
-            d.text((105, sy), line, font=summary_font, fill=WHITE)
-            sy += line_height
-        d.text((78, 1190), "NEXZENCRICINFO  •  NEXT GEN CRICKET", font=font(19, True), fill=TEAL)
+        # Title occupies its own measured region with adaptive sizing;
+        # no overlaying summary panel or shortened headline.
+        title_font, title_lines = fit_text_in_box(
+            d, article["title"], max_width=850, max_height=230,
+            start_size=48, min_size=22, line_spacing=6, bold=True
+        )
+        title_y = 842
+        line_spacing = 6
+        for line in title_lines:
+            d.text((92, title_y), line, font=title_font, fill=WHITE,
+                   stroke_width=1, stroke_fill=(4, 15, 34))
+            title_y += title_font.size + line_spacing
+
+        # A simple gold cricket-ball divider replaces the former highlighted
+        # summary box. Story descriptions remain in the post caption/draft.
+        divider_y = 1110
+        d.line((125, divider_y, 465, divider_y), fill=GOLD, width=3)
+        d.line((615, divider_y, 955, divider_y), fill=GOLD, width=3)
+        d.ellipse((520, divider_y - 25, 560, divider_y + 15),
+                  outline=GOLD, width=3)
+        d.line((530, divider_y + 7, 550, divider_y - 17), fill=GOLD, width=2)
+
+        d.text((78, 1190), "NEXZENCRICINFO  •  NEXT GEN CRICKET",
+               font=font(18, True), fill=TEAL)
         path = directory / f"slide-{index + 1}.jpg"
         save_slide(im, path)
         paths.append(path)
+
     return paths
 
 
