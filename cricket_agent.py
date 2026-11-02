@@ -573,8 +573,8 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
         d = ImageDraw.Draw(im)
         d.rectangle((77, 244, 1003, 821), outline=TEAL, width=2)
 
-        # Title occupies its own measured region with adaptive sizing and
-        # up to four lines; no overlaying summary panel or clipping.
+        # Title occupies its own measured region with adaptive sizing;
+        # no overlaying summary panel or shortened headline.
         title_font, title_lines = fit_text_in_box(
             d, article["title"], max_width=850, max_height=230,
             start_size=48, min_size=22, line_spacing=6, bold=True
