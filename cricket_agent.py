@@ -376,6 +376,23 @@ def fit_text(draw, text: str, max_width: int, max_lines: int, start_size: int, m
     lines[-1] = last.rstrip() + "…"
     return f, lines
 
+def fit_text_in_box(draw, text: str, max_width: int, max_height: int,
+                    start_size: int = 48, min_size: int = 22,
+                    line_spacing: int = 6, bold: bool = True):
+    """Fit every word of a headline inside a measured area without ellipsis."""
+    text = clean_text(text)
+    for size in range(start_size, min_size - 1, -2):
+        typeface = font(size, bold)
+        lines = wrap(draw, text, typeface, max_width)
+        total_height = len(lines) * (typeface.size + line_spacing) - line_spacing
+        if total_height <= max_height:
+            return typeface, lines
+    # Retain the complete headline at the smallest supported size as a final
+    # fallback. The 230px title region accommodates normal cricket headlines.
+    typeface = font(min_size, bold)
+    return typeface, wrap(draw, text, typeface, max_width)
+
+
 def gradient_background():
     """Create the brand's navy-to-royal-blue-to-violet sports gradient."""
     im = Image.new("RGB", SIZE, NAVY)
@@ -558,11 +575,12 @@ def create_carousel(articles: list[dict[str, str]], date: str, directory: Path) 
 
         # Title occupies its own measured region with adaptive sizing and
         # up to four lines; no overlaying summary panel or clipping.
-        title_font, title_lines = fit_text(
-            d, article["title"], 850, 4, 48, 34, True
+        title_font, title_lines = fit_text_in_box(
+            d, article["title"], max_width=850, max_height=230,
+            start_size=48, min_size=22, line_spacing=6, bold=True
         )
-        title_y = 850
-        line_spacing = 8
+        title_y = 842
+        line_spacing = 6
         for line in title_lines:
             d.text((92, title_y), line, font=title_font, fill=WHITE,
                    stroke_width=1, stroke_fill=(4, 15, 34))
