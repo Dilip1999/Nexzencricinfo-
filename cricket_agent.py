@@ -57,6 +57,21 @@ def story_key(title: str) -> str:
     return re.sub(r"\W+", " ", clean_text(title).lower()).strip()
 
 
+# Hard editorial exclusion: Pakistan and Bangladesh stories must not be published.
+EXCLUDED_COUNTRY_RE = re.compile(
+    r"\b(?:pakistan(?:i|is)?|bangladesh(?:i|is)?)\b", re.IGNORECASE
+)
+
+
+def is_excluded_story(article: dict[str, str]) -> bool:
+    """Reject restricted-country stories across headline, summary, and metadata."""
+    searchable_text = " ".join(
+        str(article.get(field, ""))
+        for field in ("title", "summary", "description", "content", "source")
+    )
+    return bool(EXCLUDED_COUNTRY_RE.search(clean_text(searchable_text)))
+
+
 
 
 def extract_image_urls(entry) -> list[str]:
@@ -239,21 +254,27 @@ def resolve_google_news_urls(urls: list[str]) -> dict[str, str]:
 
 
 def fetch_articles() -> list[dict[str, str]]:
-    """Combine fresh OpenCricket match data with Google News RSS."""
+    """Combine fresh eligible OpenCricket match data with Google News RSS."""
     history_path = Path("content_history.json")
     history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {"stories": []}
     previously_used = {story_key(str(item.get("title", ""))) for item in history.get("stories", [])}
     items, seen = [], set()
+    excluded_count = 0
+
     try:
         for match in fetch_matches():
             article = match_to_article(match)
             if not article:
                 continue
+            if is_excluded_story(article):
+                excluded_count += 1
+                print(f"Excluded restricted-country OpenCricket story: {article.get('title', '')}")
+                continue
             key = story_key(article["title"])
             if not key or key in previously_used or key in seen:
                 continue
-            # API match records may not include photos; use the same photo gate
-            # as RSS and discover one from the source page when possible.
+
+            # Resolve photos only for stories that pass the editorial filter.
             api_candidates = [str(article.get("image_url") or "").strip()]
             api_candidates.extend(article.get("image_candidates", []))
             valid_image = first_usable_image(
@@ -271,6 +292,7 @@ def fetch_articles() -> list[dict[str, str]]:
                 break
     except Exception as exc:
         print(f"OpenCricket API unavailable; using RSS fallback ({type(exc).__name__}).")
+
     feed = feedparser.parse(NEWS_FEED)
     rss_candidates = []
     for entry in feed.entries:
@@ -279,19 +301,24 @@ def fetch_articles() -> list[dict[str, str]]:
         key = story_key(title)
         if not title or not url or key in seen or key in previously_used:
             continue
-        rss_candidates.append({
+
+        article = {
             "title": title,
             "url": url,
             "summary": clean_summary(str(entry.get("summary", "")), title),
             "source": "Google News RSS",
             "image_candidates": extract_image_urls(entry),
-        })
+        }
+        if is_excluded_story(article):
+            excluded_count += 1
+            print(f"Excluded restricted-country RSS story: {title}")
+            continue
+        rss_candidates.append(article)
         if len(rss_candidates) >= MAX_RSS_LINKS_TO_RESOLVE:
             break
 
     # Google News RSS links are wrappers. Resolve them before requesting the
-    # publisher's Open Graph/Twitter image metadata; the wrapper page itself
-    # is only a JavaScript shell for ordinary HTTP clients.
+    # publisher's Open Graph/Twitter image metadata.
     wrapped_urls = [
         article["url"] for article in rss_candidates
         if article["url"].startswith("https://news.google.com/")
@@ -305,8 +332,6 @@ def fetch_articles() -> list[dict[str, str]]:
         publisher_url = resolved_urls.get(original_url, original_url)
         article["url"] = publisher_url
 
-        # Do not use Google-hosted RSS thumbnails as editorial photos. They
-        # are often the same 300x300 feed thumbnail for unrelated stories.
         publisher_candidates = [
             candidate for candidate in article["image_candidates"]
             if "googleusercontent.com" not in candidate
@@ -325,56 +350,14 @@ def fetch_articles() -> list[dict[str, str]]:
         items.append(article)
         if len(items) >= MAX_ARTICLES:
             break
+
     if not items:
-        raise RuntimeError("No fresh cricket stories found from OpenCricket API or RSS.")
-    print(f"Selected {len(items)} eligible fresh stories; history excludes {len(previously_used)} prior stories.")
+        raise RuntimeError("No fresh eligible cricket stories found from OpenCricket API or RSS.")
+    print(
+        f"Selected {len(items)} eligible fresh stories; excluded {excluded_count} "
+        f"Pakistan/Bangladesh stories; history excludes {len(previously_used)} prior stories."
+    )
     return items
-
-def font(size: int, bold: bool = False):
-    path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    try:
-        return ImageFont.truetype(path, size)
-    except OSError:
-        return ImageFont.load_default()
-
-
-def wrap(draw, text: str, f, width: int) -> list[str]:
-    result, line = [], ""
-    for word in text.split():
-        candidate = (line + " " + word).strip()
-        if draw.textbbox((0, 0), candidate, font=f)[2] <= width:
-            line = candidate
-        else:
-            if line:
-                result.append(line)
-            line = word
-    if line:
-        result.append(line)
-    return result
-
-
-
-def fit_text(draw, text: str, max_width: int, max_lines: int, start_size: int, min_size: int = 26, bold: bool = True) -> tuple[object, list[str]]:
-    """Choose a readable font size and wrap text within a fixed editorial text box.
-
-    If the text still exceeds the line budget at min_size, trim the final line
-    with an ellipsis rather than drawing outside the slide's content area.
-    """
-    text = clean_text(text)
-    for size in range(start_size, min_size - 1, -2):
-        f = font(size, bold)
-        lines = wrap(draw, text, f, max_width)
-        if len(lines) <= max_lines:
-            return f, lines
-    f = font(min_size, bold)
-    lines = wrap(draw, text, f, max_width)[:max_lines]
-    if not lines:
-        return f, []
-    last = lines[-1]
-    while last and draw.textbbox((0, 0), last + "…", font=f)[2] > max_width:
-        last = last[:-1]
-    lines[-1] = last.rstrip() + "…"
-    return f, lines
 
 def fit_text_in_box(draw, text: str, max_width: int, max_height: int,
                     start_size: int = 48, min_size: int = 22,
