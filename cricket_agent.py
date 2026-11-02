@@ -359,6 +359,55 @@ def fetch_articles() -> list[dict[str, str]]:
     )
     return items
 
+def font(size: int, bold: bool = False):
+    """Load a readable DejaVu Sans font, with Pillow's default as a fallback."""
+    font_path = (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    )
+    try:
+        return ImageFont.truetype(font_path, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def wrap(draw, text: str, typeface, width: int) -> list[str]:
+    """Wrap text into lines that fit the supplied pixel width."""
+    result, line = [], ""
+    for word in text.split():
+        candidate = (line + " " + word).strip()
+        if draw.textbbox((0, 0), candidate, font=typeface)[2] <= width:
+            line = candidate
+        else:
+            if line:
+                result.append(line)
+            line = word
+    if line:
+        result.append(line)
+    return result
+
+
+def fit_text(draw, text: str, max_width: int, max_lines: int,
+             start_size: int, min_size: int = 26, bold: bool = True):
+    """Fit a fixed number of lines, using an ellipsis only as a legacy fallback."""
+    text = clean_text(text)
+    for size in range(start_size, min_size - 1, -2):
+        typeface = font(size, bold)
+        lines = wrap(draw, text, typeface, max_width)
+        if len(lines) <= max_lines:
+            return typeface, lines
+    typeface = font(min_size, bold)
+    lines = wrap(draw, text, typeface, max_width)[:max_lines]
+    if not lines:
+        return typeface, []
+    last = lines[-1]
+    while last and draw.textbbox((0, 0), last + "…", font=typeface)[2] > max_width:
+        last = last[:-1]
+    lines[-1] = last.rstrip() + "…"
+    return typeface, lines
+
+
 def fit_text_in_box(draw, text: str, max_width: int, max_height: int,
                     start_size: int = 48, min_size: int = 22,
                     line_spacing: int = 6, bold: bool = True):
