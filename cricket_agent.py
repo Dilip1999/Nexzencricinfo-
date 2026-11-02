@@ -15,11 +15,17 @@ from zoneinfo import ZoneInfo
 
 import feedparser
 from opencricket_client import fetch_matches, match_to_article
+
+try:
+    from googlenewsdecoder import gnewsdecoder
+except ImportError:  # Keep draft generation resilient if the optional resolver is unavailable.
+    gnewsdecoder = None
 from PIL import Image, ImageDraw, ImageFont
 
 IST = ZoneInfo("Asia/Kolkata")
 NEWS_FEED = "https://news.google.com/rss/search?q=cricket+(India+OR+IPL+OR+ICC+OR+Test+OR+ODI+OR+T20)&hl=en-IN&gl=IN&ceid=IN:en"
 MAX_ARTICLES = 5
+MAX_RSS_LINKS_TO_RESOLVE = 30
 SIZE = (1080, 1350)
 NAVY = (12, 20, 54)       # Premium deep navy
 PANEL = (22, 39, 92)       # Royal-blue panel
@@ -207,6 +213,31 @@ def extract_page_image_url(article_url: str) -> str:
     return ""
 
 
+def resolve_google_news_urls(urls: list[str]) -> dict[str, str]:
+    """Resolve Google News wrapper URLs to their publisher article URLs in one batch."""
+    if not urls:
+        return {}
+    if gnewsdecoder is None:
+        print("Google News URL decoder is unavailable; publisher-page image lookup is skipped.")
+        return {}
+
+    try:
+        results = gnewsdecoder(urls, interval=0.15, timeout=12.0)
+        if isinstance(results, dict):
+            results = [results]
+        resolved = {}
+        for original, result in zip(urls, results):
+            if isinstance(result, dict) and result.get("success") and result.get("decoded_url"):
+                destination = str(result["decoded_url"]).strip()
+                if destination.startswith(("https://", "http://")):
+                    resolved[original] = destination
+        print(f"Resolved {len(resolved)} of {len(urls)} Google News publisher URLs.")
+        return resolved
+    except Exception as exc:
+        print(f"Google News URL resolution failed ({type(exc).__name__}: {str(exc)[:160]}).")
+        return {}
+
+
 def fetch_articles() -> list[dict[str, str]]:
     """Combine fresh OpenCricket match data with Google News RSS."""
     history_path = Path("content_history.json")
@@ -241,26 +272,55 @@ def fetch_articles() -> list[dict[str, str]]:
     except Exception as exc:
         print(f"OpenCricket API unavailable; using RSS fallback ({type(exc).__name__}).")
     feed = feedparser.parse(NEWS_FEED)
+    rss_candidates = []
     for entry in feed.entries:
         title = clean_text(str(entry.get("title", "")))
         url = str(entry.get("link", "")).strip()
         key = story_key(title)
-        image_candidates = extract_image_urls(entry)
-        article = {"title": title, "url": url,
-                   "summary": clean_summary(str(entry.get("summary", "")), title),
-                   "source": "Google News RSS",
-                   "image_candidates": image_candidates}
         if not title or not url or key in seen or key in previously_used:
             continue
-        # First validate RSS image candidates. If RSS omits a usable image,
-        # inspect publisher social-preview metadata (og:image / twitter:image).
-        valid_image = first_usable_image(image_candidates)
+        rss_candidates.append({
+            "title": title,
+            "url": url,
+            "summary": clean_summary(str(entry.get("summary", "")), title),
+            "source": "Google News RSS",
+            "image_candidates": extract_image_urls(entry),
+        })
+        if len(rss_candidates) >= MAX_RSS_LINKS_TO_RESOLVE:
+            break
+
+    # Google News RSS links are wrappers. Resolve them before requesting the
+    # publisher's Open Graph/Twitter image metadata; the wrapper page itself
+    # is only a JavaScript shell for ordinary HTTP clients.
+    wrapped_urls = [
+        article["url"] for article in rss_candidates
+        if article["url"].startswith("https://news.google.com/")
+        or article["url"].startswith("http://news.google.com/")
+    ]
+    resolved_urls = resolve_google_news_urls(wrapped_urls)
+
+    for article in rss_candidates:
+        title = article["title"]
+        original_url = article["url"]
+        publisher_url = resolved_urls.get(original_url, original_url)
+        article["url"] = publisher_url
+
+        # Do not use Google-hosted RSS thumbnails as editorial photos. They
+        # are often the same 300x300 feed thumbnail for unrelated stories.
+        publisher_candidates = [
+            candidate for candidate in article["image_candidates"]
+            if "googleusercontent.com" not in candidate
+            and "news.google.com" not in candidate
+        ]
+        valid_image = first_usable_image(publisher_candidates)
+        if not valid_image and "news.google.com" not in publisher_url:
+            valid_image = extract_page_image_url(publisher_url)
         if not valid_image:
-            valid_image = extract_page_image_url(url)
-        if not valid_image:
-            print(f"Skipping story without a usable photo after RSS and page metadata: {title}")
+            print(f"Skipping story without a usable publisher photo: {title}")
             continue
+
         article["image_url"] = valid_image
+        key = story_key(title)
         seen.add(key)
         items.append(article)
         if len(items) >= MAX_ARTICLES:

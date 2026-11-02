@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-API_ROOT = os.getenv("OPENCRICKET_API_BASE_URL", "https://api.opencricketapi.com").rstrip("/")
+API_ROOT = os.getenv("OPENCRICKET_API_BASE_URL", "https://opencricketapi.com").rstrip("/")
 MATCHES_PATH = "/v1/matches"
 TIMEOUT = 25
 
@@ -32,7 +32,7 @@ def fetch_matches(limit: int = 30) -> list[dict[str, Any]]:
     return [record for record in records if isinstance(record, dict)]
 
 
-def match_to_article(match: dict[str, Any]) -> dict[str, str] | None:
+def match_to_article(match: dict[str, Any]) -> dict[str, Any] | None:
     """Turn a completed, recent match into a concise attributed draft item."""
     result = str(match.get("result") or "").strip()
     if not result:
@@ -60,10 +60,23 @@ def match_to_article(match: dict[str, Any]) -> dict[str, str] | None:
     venue_name = venue.get("name", "") if isinstance(venue, dict) else str(venue)
     title = f"{matchup}: {result}"
     details = [part for part in (competition_name, stage, venue_name, f"Match date: {date_text}") if part]
-    source_url = str(match.get("source_url") or match.get("url") or "https://opencricketapi.com")
-    return {
+    source_url = str(match.get("source_url") or match.get("url") or "").strip()
+    article: dict[str, Any] = {
         "title": title,
         "url": source_url,
         "summary": " • ".join(details) + " • Match data: OpenCricketAPI",
         "source": "OpenCricketAPI",
     }
+    # Preserve optional media fields if the API supplies them; older code
+    # discarded these fields before the image-validation stage could inspect them.
+    for field in ("image_url", "thumbnail_url", "image", "thumbnail"):
+        value = match.get(field)
+        if isinstance(value, str) and value.strip():
+            article["image_url"] = value.strip()
+            break
+    candidates = match.get("image_candidates")
+    if isinstance(candidates, list):
+        article["image_candidates"] = [
+            str(value).strip() for value in candidates if isinstance(value, str) and value.strip()
+        ]
+    return article
