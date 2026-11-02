@@ -115,6 +115,35 @@ def image_url_is_usable(url: str) -> bool:
         print(f"Image candidate rejected ({label}): {type(exc).__name__}: {str(exc)[:180]}")
         return False
 
+
+def image_url_variants(url: str) -> list[str]:
+    """Try larger versions of Google-hosted image thumbnails."""
+    if not url:
+        return []
+
+    variants = [url]
+
+    if "googleusercontent.com" in url:
+        # Google News thumbnails often end with a size parameter, e.g. =s0-w300.
+        base = url.split("=", 1)[0]
+        variants.extend([
+            f"{base}=s0",
+            f"{base}=w1200",
+            f"{base}=s0-w1200",
+        ])
+
+    return list(dict.fromkeys(variants))
+
+
+def first_usable_image(urls: list[str]) -> str:
+    """Return the first image candidate that passes validation."""
+    for url in urls:
+        for candidate in image_url_variants(url):
+            if image_url_is_usable(candidate):
+                return candidate
+
+    return ""
+
 class _ArticleImageParser(HTMLParser):
     """Collect social-preview and embedded image URLs from publisher HTML."""
 
@@ -196,8 +225,9 @@ def fetch_articles() -> list[dict[str, str]]:
             # as RSS and discover one from the source page when possible.
             api_candidates = [str(article.get("image_url") or "").strip()]
             api_candidates.extend(article.get("image_candidates", []))
-            valid_image = next((candidate for candidate in api_candidates
-                                if candidate and image_url_is_usable(candidate)), "")
+            valid_image = first_usable_image(
+                [candidate for candidate in api_candidates if candidate]
+            )
             if not valid_image:
                 valid_image = extract_page_image_url(str(article.get("url") or ""))
             if not valid_image:
@@ -224,8 +254,7 @@ def fetch_articles() -> list[dict[str, str]]:
             continue
         # First validate RSS image candidates. If RSS omits a usable image,
         # inspect publisher social-preview metadata (og:image / twitter:image).
-        valid_image = next((candidate for candidate in image_candidates
-                            if image_url_is_usable(candidate)), "")
+        valid_image = first_usable_image(image_candidates)
         if not valid_image:
             valid_image = extract_page_image_url(url)
         if not valid_image:
@@ -326,7 +355,12 @@ def fetch_photo(article: dict[str, str], size: tuple[int, int]) -> Image.Image |
     """Try feed image candidates and return the first usable cropped photo."""
     urls = [article.get("image_url", "").strip()]
     urls.extend(article.get("image_candidates", []))
+
+    expanded_urls = []
     for url in dict.fromkeys(urls):
+        expanded_urls.extend(image_url_variants(url))
+
+    for url in dict.fromkeys(expanded_urls):
         if not url.startswith(("https://", "http://")):
             continue
         try:
