@@ -128,7 +128,7 @@ jobs:
           retention-days: 7
       - name: Commit generated draft and images
         run: |
-          git add drafts/ images/
+          git add drafts/ images/ videos/
           if git diff --cached --quiet; then
             echo "No generated changes."
           else
