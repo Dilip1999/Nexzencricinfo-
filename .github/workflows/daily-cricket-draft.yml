@@ -104,9 +104,6 @@ jobs:
           else
             echo "Skipping Instagram publishing because no complete carousel was generated."
           fi
-      - name: Generate original background audio
-        if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
-        run: python generate_reel_audio.py
       - name: Install FFmpeg for Reel rendering
         if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
         run: |
@@ -120,7 +117,7 @@ jobs:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
         run: |
           TODAY=$(TZ=Asia/Kolkata date +%F)
-          python create_reel.py --date "$TODAY" --slot "$POST_SLOT" --audio assets/audio/nexzencricinfo_original.wav
+          python create_reel.py --date "$TODAY" --slot "$POST_SLOT" --audio positive_sound-cricket-487179.mp3
       - name: Upload generated Reel preview
         if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
