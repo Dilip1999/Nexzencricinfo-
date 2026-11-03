@@ -72,7 +72,7 @@ jobs:
       - name: Generate engaging cricket carousel
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
-          PUBLISHING_MODE: ${{ inputs.publishing_mode || 'regular' }}
+          PUBLISHING_MODE: ${{ inputs.publishing_mode || (github.event_name == 'schedule' && 'reels') || 'regular' }}
           OPENCRICKET_API_KEY: ${{ secrets.OPENCRICKET_API_KEY }}
         run: python cricket_agent.py
       - name: Verify complete carousel assets
@@ -105,21 +105,21 @@ jobs:
             echo "Skipping Instagram publishing because no complete carousel was generated."
           fi
       - name: Install FFmpeg for Reel rendering
-        if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
+        if: (github.event_name == 'schedule' || inputs.publishing_mode == 'reels') && steps.carousel.outputs.ready == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --yes ffmpeg
           ffmpeg -version
 
       - name: Render vertical Reel preview
-        if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
+        if: (github.event_name == 'schedule' || inputs.publishing_mode == 'reels') && steps.carousel.outputs.ready == 'true'
         env:
           POST_SLOT: ${{ steps.slot.outputs.slot }}
         run: |
           TODAY=$(TZ=Asia/Kolkata date +%F)
           python create_reel.py --date "$TODAY" --slot "$POST_SLOT" --audio positive_sound-cricket-487179.mp3
       - name: Upload generated Reel preview
-        if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
+        if: (github.event_name == 'schedule' || inputs.publishing_mode == 'reels') && steps.carousel.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: nexzencricinfo-reel-preview
@@ -139,7 +139,7 @@ jobs:
           fi
       - name: Publish to Instagram
         id: instagram
-        if: inputs.publishing_mode != 'reels' && vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.carousel.outputs.ready == 'true'
+        if: github.event_name != 'schedule' && inputs.publishing_mode != 'reels' && vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.carousel.outputs.ready == 'true'
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ vars.INSTAGRAM_USER_ID }}
@@ -150,7 +150,7 @@ jobs:
         run: python publish_instagram.py
       - name: Publish Instagram Reel
         id: instagram_reel
-        if: inputs.publishing_mode == 'reels' && vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.carousel.outputs.ready == 'true'
+        if: (github.event_name == 'schedule' || inputs.publishing_mode == 'reels') && vars.ENABLE_INSTAGRAM_PUBLISH == 'true' && steps.carousel.outputs.ready == 'true'
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ vars.INSTAGRAM_USER_ID }}
