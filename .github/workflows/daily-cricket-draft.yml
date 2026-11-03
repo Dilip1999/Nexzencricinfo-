@@ -107,6 +107,13 @@ jobs:
       - name: Generate original background audio
         if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
         run: python generate_reel_audio.py
+      - name: Install FFmpeg for Reel rendering
+        if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+
       - name: Render vertical Reel preview
         if: inputs.publishing_mode == 'reels' && steps.carousel.outputs.ready == 'true'
         env:
