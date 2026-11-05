@@ -2,9 +2,9 @@ name: Daily Cricket News and Instagram
 
 on:
   schedule:
-    - cron: "0 6 * * *"  # 11:30 AM IST
-    - cron: "0 11 * * *" # 4:30 PM IST
-    - cron: "0 16 * * *" # 9:30 PM IST
+    - cron: "30 6 * * *" # 11:30 AM IST
+    - cron: "30 11 * * *" # 4:30 PM IST
+    - cron: "30 16 * * *" # 9:30 PM IST
   workflow_dispatch:
     inputs:
       publishing_mode:
@@ -43,9 +43,9 @@ jobs:
         env:
           SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [ "$SCHEDULE" = "0 6 * * *" ]; then SLOT=morning
-          elif [ "$SCHEDULE" = "0 11 * * *" ]; then SLOT=evening
-          elif [ "$SCHEDULE" = "0 16 * * *" ]; then SLOT=night
+          if [ "$SCHEDULE" = "30 6 * * *" ]; then SLOT=morning
+          elif [ "$SCHEDULE" = "30 11 * * *" ]; then SLOT=evening
+          elif [ "$SCHEDULE" = "30 16 * * *" ]; then SLOT=night
           else
             HOUR=$(TZ=Asia/Kolkata date +%H)
             if [ "$HOUR" -lt 14 ]; then SLOT=morning
