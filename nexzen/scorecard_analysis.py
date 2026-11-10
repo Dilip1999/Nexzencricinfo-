@@ -65,7 +65,7 @@ def analyze_scorecard(payload: dict[str, Any], *, source_url: str) -> dict[str, 
             "wickets": _number(item.get("wickets", 0), "innings.wickets"),
             "overs": str(item.get("overs", "")), "run_rate": item.get("run_rate"),
             "top_scorers": sorted(batters, key=lambda x: (x["runs"], x["balls"]), reverse=True)[:3],
-            "bowling_figures": sorted(bowlers, key=lambda x: (x["wickets"], -(x["economy"] if x["economy"] is not None else 999)))[:3],
+            "bowling_figures": sorted(bowlers, key=lambda x: (-x["wickets"], x["economy"] if x["economy"] is not None else 999))[:3],
             "batting_card": batters, "bowling_card": bowlers,
         })
     return {
