@@ -1,14 +1,20 @@
 name: NexZen QA Scorecard Data Pipeline
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [QA]
+    paths:
+      - 'nexzen/fetch_sample.py'
+      - 'nexzen/scorecard_analysis.py'
+      - 'nexzen/providers/cricketdata.py'
+      - 'tests/test_scorecard_analysis.py'
+      - '.github/workflows/nexzen-scorecard-qa.yml'
 
 permissions:
   contents: read
 
 jobs:
   scorecard-pipeline:
-    if: github.ref == 'refs/heads/QA'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
