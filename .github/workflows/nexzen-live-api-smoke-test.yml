@@ -1,14 +1,17 @@
 name: NexZen QA Live Cricket Database Smoke Test
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [QA]
+    paths:
+      - 'nexzen/smoke_test.py'
+      - '.github/workflows/nexzen-live-api-smoke-test.yml'
 
 permissions:
   contents: read
 
 jobs:
   smoke-test:
-    if: github.ref == 'refs/heads/QA'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
