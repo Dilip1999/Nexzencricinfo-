@@ -1,0 +1,16 @@
+{
+  "pillar": "stats",
+  "title": "Replace with a factual cricket story title",
+  "hook": "Replace with a short, engaging hook",
+  "context": "Specify player/team, format, competition and period.",
+  "analysis": "Explain verified numbers without inventing a conclusion.",
+  "takeaway": "Summarise the evidence in one clear sentence.",
+  "cta": "Ask a specific question that invites cricket discussion.",
+  "claims": [{"text":"Replace with a precise, verifiable claim.","source_ids":["official-scorecard"]}],
+  "sources": {"official-scorecard":{"name":"Replace with the official publisher","url":"https://replace-with-real-source.example/scorecard","published_at":"YYYY-MM-DD","retrieved_at":"YYYY-MM-DD"}},
+  "format": "T20",
+  "competition": "Replace with competition name",
+  "as_of": "YYYY-MM-DD",
+  "status": "draft",
+  "metadata": {"visual_concept":"Animated stat comparison card","brand_theme":"cricket-journal-editorial-luxury"}
+}
