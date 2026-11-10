@@ -3,7 +3,7 @@ from nexzen.quality_gate import validate_analysis_report
 
 def report():
  return {"source_url":"https://cricketdatabase.com/matches/example","innings":[
-  {"runs":10,"wickets":1,"overs":"2","batting_card":[{"runs":8,"out":True},{"runs":0,"out":False}],"bowling_card":[
+  {"runs":10,"extras":2,"wickets":1,"overs":"2","batting_card":[{"runs":8,"out":True},{"runs":0,"out":False}],"bowling_card":[
    {"player_id":"a","overs":"1","runs_conceded":4,"wickets":1,"economy":4.0},
    {"player_id":"b","overs":"1","runs_conceded":6,"wickets":0,"economy":6.0}],
    "bowling_figures":[{"player_id":"a"},{"player_id":"b"}]}]}
