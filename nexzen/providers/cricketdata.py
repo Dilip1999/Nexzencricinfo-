@@ -1,20 +1,19 @@
-"""CricketData.org (CricAPI) adapter.
+"""Cricket Database API adapter (https://cricketdatabase.com).
 
-API key is supplied only at request time from CRICKETDATA_API_KEY. Never commit
-credentials. The provider documents key-in-query authentication; callers must
-avoid logging full request URLs because they contain the key.
+Uses Bearer authentication and the provider's /v1 REST API. Never logs the key.
+The free plan does not include live endpoints; a plan restriction is surfaced
+as a provider error rather than silently treated as empty data.
 """
 from __future__ import annotations
 import os
 from typing import Any
-from urllib.parse import urlparse
 import requests
 
-API_ROOT = "https://api.cricapi.com/v1"
+API_ROOT = "https://api.cricketdatabase.com/v1"
 DEFAULT_TIMEOUT = 20
 
 class CricketDataError(RuntimeError):
-    """Raised for provider errors or malformed responses."""
+    """Raised for provider errors, plan restrictions or malformed responses."""
 
 class CricketDataClient:
     def __init__(self, api_key: str | None = None, *, session=None, timeout: int = DEFAULT_TIMEOUT):
@@ -26,60 +25,64 @@ class CricketDataClient:
     def configured(self) -> bool:
         return bool(self.api_key)
 
-    def _get(self, endpoint: str, **params: Any) -> dict[str, Any]:
+    def _get(self, path: str, **params: Any) -> dict[str, Any]:
         if not self.api_key:
             raise CricketDataError("CRICKETDATA_API_KEY is not configured.")
-        if endpoint.startswith("/") or ".." in endpoint:
+        if not path or path.startswith("/") or ".." in path:
             raise ValueError("Endpoint must be a safe API path.")
         response = self.session.get(
-            f"{API_ROOT}/{endpoint}",
-            params={"apikey": self.api_key, **params},
-            headers={"Accept": "application/json"},
+            f"{API_ROOT}/{path}",
+            params=params,
+            headers={"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            # Do not include request URL or headers: credentials must never enter logs.
+            raise CricketDataError(f"Cricket Database HTTP error: {response.status_code}") from exc
         try:
             payload = response.json()
         except ValueError as exc:
             raise CricketDataError("Provider returned invalid JSON.") from exc
-        if not isinstance(payload, dict):
-            raise CricketDataError("Provider response must be a JSON object.")
-        status = str(payload.get("status", "")).lower()
-        if status and status not in ("success", "ok"):
-            message = str(payload.get("reason") or payload.get("message") or "Provider reported failure")
-            raise CricketDataError(message[:300])
-        if "data" not in payload:
-            raise CricketDataError("Provider response is missing the data field.")
+        if not isinstance(payload, dict) or "data" not in payload:
+            raise CricketDataError("Provider response must be an object containing data.")
+        error = payload.get("error")
+        if error:
+            if isinstance(error, dict):
+                message = error.get("message") or error.get("code") or "Provider request failed"
+            else:
+                message = str(error)
+            raise CricketDataError(str(message)[:300])
         return payload
 
-    def matches(self, offset: int = 0) -> dict[str, Any]:
-        return self._get("matches", offset=_valid_offset(offset))
+    def matches(self, **filters: Any) -> dict[str, Any]:
+        """List matches; free key covers full recent window and samples older archive."""
+        return self._get("matches", **filters)
 
-    def series(self, offset: int = 0, search: str | None = None) -> dict[str, Any]:
-        params: dict[str, Any] = {"offset": _valid_offset(offset)}
-        if search and search.strip():
-            params["search"] = search.strip()
-        return self._get("series", **params)
+    def results_yesterday(self) -> dict[str, Any]:
+        return self._get("results/yesterday")
 
-    def player_search(self, search: str, offset: int = 0) -> dict[str, Any]:
-        if not search.strip():
+    def match(self, match: str) -> dict[str, Any]:
+        return self._get(f"matches/{_valid_slug(match)}")
+
+    def scorecard(self, match: str) -> dict[str, Any]:
+        return self._get(f"matches/{_valid_slug(match)}/scorecard")
+
+    def player_stats(self, player: str) -> dict[str, Any]:
+        return self._get(f"players/{_valid_slug(player)}/stats")
+
+    def player_search(self, query: str) -> dict[str, Any]:
+        if not query.strip():
             raise ValueError("Player search text is required.")
-        return self._get("players", offset=_valid_offset(offset), search=search.strip())
+        return self._get("search", q=query.strip())
 
-    def scorecard(self, match_id: str) -> dict[str, Any]:
-        return self._get("match_scorecard", id=_valid_id(match_id))
+    def live_matches(self, **filters: Any) -> dict[str, Any]:
+        """Available on Match Week, Pro and Analyst Pro; not the Free plan."""
+        return self._get("live", **filters)
 
-    def squad(self, match_id: str) -> dict[str, Any]:
-        # Provider documents this Fantasy endpoint; availability may depend on plan.
-        return self._get("match_squad", id=_valid_id(match_id))
-
-def _valid_offset(offset: int) -> int:
-    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
-        raise ValueError("offset must be a non-negative integer.")
-    return offset
-
-def _valid_id(value: str) -> str:
+def _valid_slug(value: str) -> str:
     cleaned = str(value).strip()
-    if not cleaned or len(cleaned) > 200:
-        raise ValueError("A valid provider resource ID is required.")
+    if not cleaned or len(cleaned) > 200 or "/" in cleaned or ".." in cleaned:
+        raise ValueError("A valid provider resource address is required.")
     return cleaned
