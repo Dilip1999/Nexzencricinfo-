@@ -1,29 +1,28 @@
-# Cricket data provider adapter
+# Cricket Database provider integration
 
-## Provider evaluated: CricketData.org / CricAPI
+Provider: https://cricketdatabase.com  
+API root: https://api.cricketdatabase.com/v1  
+Authentication: `Authorization: Bearer <key>`  
+Secret: `CRICKETDATA_API_KEY`
 
-Official docs currently describe:
-- Matches list: `GET /v1/matches`
-- Series list/search: `GET /v1/series`
-- Player search: `GET /v1/players`
-- Scorecard: `GET /v1/match_scorecard?id=...`
-- Squad: `GET /v1/match_squad?id=...`
+The adapter is specifically for Cricket Database, not Cricapi / CricketData.org. It supports documented endpoints:
+- `GET /matches`
+- `GET /results/yesterday`
+- `GET /matches/{match}`
+- `GET /matches/{match}/scorecard`
+- `GET /players/{player}/stats`
+- `GET /search?q=...`
+- `GET /live` (paid plans only; Free key does not include live matches)
 
-The provider documents a lifetime-free tier with 100 API hits/day and paid tiers beginning at $5.99/month. It says the free tier can have data a few minutes behind real time. Fantasy scorecard/squad endpoints may have paid-plan restrictions or trial-mode limitations. Verify current account entitlement, tournament coverage, data rights and usage terms in the provider console before production use.
+## Free-plan constraints
+The provider documentation currently states 50 successful calls/day and full recent results/scorecards for the last 30 days, with samples for older archive data. Live matches are not included on Free; Match Week, Pro and Analyst Pro include live access. Do not assume that an endpoint returning a sample represents full archive coverage.
 
-References:
-- https://cricketdata.org/pricing/
-- https://cricketdata.org/python-code-samples/
-- https://cricketdata.org/how-to-use-fantasy-cricket-api.aspx
+## QA smoke test
+Run the mocked contract tests with:
+```bash
+python -m unittest tests.test_cricketdata_client -v
+```
 
-## Implementation in this branch
+The GitHub Actions QA workflow must inject `CRICKETDATA_API_KEY` from repository secrets only into a manually dispatched or QA-branch job. Never print the key, request headers, or full request URLs. Do not invoke paid-only endpoints as part of the free-plan smoke test.
 
-`nexzen/providers/cricketdata.py` provides a small client for matches, series, player search, scorecards and squads. It reads `CRICKETDATA_API_KEY` from the environment and uses the provider's documented API-key query parameter. Since the provider requires query-string authentication, never log full request URLs or expose request objects in logs.
-
-## Configure locally / GitHub Actions
-
-Add repository secret `CRICKETDATA_API_KEY` only after creating an account and reviewing terms. Do not add the key to source code, JSON fixtures, workflow YAML or commit history.
-
-## Current limitation
-
-This is a transport adapter, not a normalized data pipeline. Provider response schemas and actual entitlement must be verified using the user's own key. No live calls or Instagram publishing are performed by the QA test suite. The current free tier is a candidate for prototyping, not a guarantee of historical-statistics coverage.
+Documentation: https://cricketdatabase.com/documentation
