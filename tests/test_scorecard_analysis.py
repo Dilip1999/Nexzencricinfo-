@@ -18,6 +18,7 @@ class ScorecardAnalysisTests(unittest.TestCase):
  def test_derived_rates_and_provenance(self):
   result=analyze_scorecard(FIXTURE,source_url="https://cricketdatabase.com/matches/example")
   self.assertEqual(result["innings"][0]["top_scorers"][0]["strike_rate"],176.19)
+  self.assertEqual(result["innings"][0]["bowling_figures"][0]["player_id"],"j-b")
   self.assertEqual(result["innings"][1]["bowling_figures"][0]["economy"],8.18)
   self.assertEqual(result["editorial_status"],"data_ready_for_human_review")
   self.assertIn("source_url",result)
