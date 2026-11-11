@@ -77,9 +77,9 @@ def render_reel(title: str, scenes: list[dict], output_dir: Path, slug: str):
     concat = frame_dir / "concat.txt"
     lines = []
     for i in range(1, len(scenes)+1):
-        lines.append(f"file 'slide-{i:02d}.jpg'")
+        lines.append("file '" + str((frame_dir / f"slide-{i:02d}.jpg").resolve()) + "'")
         lines.append("duration 3")
-    lines.append(f"file 'slide-{len(scenes):02d}.jpg'")
+    lines.append("file '" + str((frame_dir / f"slide-{len(scenes):02d}.jpg").resolve()) + "'")
     concat.write_text("\\n".join(lines)+"\\n", encoding="utf-8")
     output = output_dir / slug / f"{slug}.mp4"
     subprocess.run([
