@@ -147,9 +147,11 @@ def build_sample_batch(output_dir: Path):
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
     source = fixture["provenance"]
     limitations = " ".join(fixture["limitations"])
+    player_image = fixture["featured_player_image"]
+    player_asset = player_image["asset"]
     scenes = [
-        {"background_image":"assets/players/virat_kohli.jpg","eyebrow":"THE HOOK","title":"Seven short of a hundred.","body":"Virat Kohli  •  93 off 91 balls","note":"8 fours  •  1 six  •  Strike rate 102.20","spotlight_value":"93","spotlight_label":"Runs from 91 balls","voiceover":"Seven runs short of a hundred. Virat Kohli made 93 from 91 balls against New Zealand in the first ODI."},
-        {"background_image":"assets/players/virat_kohli.jpg","eyebrow":"THE SUPPORTING STORY","title":"The innings around him","body":"Gill 56  •  Iyer 49","note":"Two more major contributions on India's scorecard.","voiceover":"Kohli wasn't the only contributor. Shubman Gill scored 56, while Shreyas Iyer added 49."},
+        {"background_image":player_asset,"eyebrow":"THE HOOK","title":"Seven short of a hundred.","body":"Virat Kohli  •  93 off 91 balls","note":"8 fours  •  1 six  •  Strike rate 102.20","spotlight_value":"93","spotlight_label":"Runs from 91 balls","voiceover":"Seven runs short of a hundred. Virat Kohli made 93 from 91 balls against New Zealand in the first ODI."},
+        {"background_image":player_asset,"eyebrow":"THE SUPPORTING STORY","title":"The innings around him","body":"Gill 56  •  Iyer 49","note":"Two more major contributions on India's scorecard.","voiceover":"Kohli wasn't the only contributor. Shubman Gill scored 56, while Shreyas Iyer added 49."},
         {"background_image":"assets/players/virat_kohli.jpg","eyebrow":"THE SCOREBOARD","title":"India reached 306 for 6","body":"49 overs  •  India won by 4 wickets","note":"Score and result exactly as shown in the supplied screenshot.","spotlight_value":"306/6","spotlight_label":"India innings total","voiceover":"India's innings finished at 306 for six in 49 overs, and the scorecard records a four-wicket win."},
         {"background_image":"assets/players/virat_kohli.jpg","eyebrow":"THE DETAIL","title":"A century that stayed just out of reach","body":"93 runs  •  8 boundaries for four  •  1 six","note":"Kohli was dismissed, caught by Michael Bracewell off Kyle Jamieson, according to the visible scorecard.","voiceover":"Kohli's 93 included eight fours and one six. The scorecard shows him caught by Michael Bracewell off Kyle Jamieson."},
         {"background_image":"assets/players/virat_kohli.jpg","eyebrow":"JOIN THE DEBATE","title":"Was 93 the defining innings?","body":"Kohli 93  •  Gill 56  •  Iyer 49","note":"Based only on the visible India innings. First-innings context is not shown.","voiceover":"Which innings stood out most to you — Kohli's 93, Gill's 56, or Iyer's 49? Tell us in the comments."}
@@ -159,7 +161,7 @@ def build_sample_batch(output_dir: Path):
         "status":"qa_sample_only",
         "publish_eligible":False,
         "audio":"silent review render; voiceover script included; soundtrack and narration not yet added",
-        "source":{"name":source,"match":fixture["match"],"venue":fixture["venue"]},"player_image":{"player":"Virat Kohli","source":"Wikimedia Commons","author":"lensbug.chandru","license":"CC BY 2.0","license_url":"https://creativecommons.org/licenses/by/2.0/","source_url":"https://commons.wikimedia.org/wiki/File:Virat_Kohli_Batting.jpg","usage_note":"Archival illustrative photo; not represented as a photo from the 2026 match."},
+        "source":{"name":source,"match":fixture["match"],"venue":fixture["venue"]},"player_image":player_image,
         "data_quality_note":limitations,
         "selection_policy":"One high-potential story from this supplied scorecard; not every match becomes content.",
         "reels":[]
@@ -173,7 +175,7 @@ def build_sample_batch(output_dir: Path):
         "**Match:** "+fixture["match"], "",
         "**Venue:** "+fixture["venue"], "",
         "**Result:** "+fixture["result"], "",
-        "**Limitations:** "+limitations, "", "**Player background image:** Virat Kohli, photo by lensbug.chandru, Wikimedia Commons, CC BY 2.0. Archival image, not from the 2026 match. https://commons.wikimedia.org/wiki/File:Virat_Kohli_Batting.jpg", ""
+        "**Limitations:** "+limitations, "", "**Featured player background:** "+player_image["player"]+" — "+player_image["attribution"]+", "+player_image["license"]+". "+player_image["note"]+" Source: "+player_image["source_url"], ""
     ]
     for i, scene in enumerate(item["scenes"],1):
         storyboard += [f"## Scene {i}", f"**{scene['eyebrow']}**", f"**{scene['title']}**", scene["body"], scene.get("note",""), "", "**Voiceover:** "+scene.get("voiceover",""), ""]
