@@ -112,7 +112,7 @@ def render_reel(title: str, scenes: list[dict], output_dir: Path, slug: str):
     lines = []
     for i in range(1, len(scenes)+1):
         lines.append("file '" + str((frame_dir / f"slide-{i:02d}.jpg").resolve()) + "'")
-        lines.append("duration 3")
+        lines.append("duration 4")
     lines.append("file '" + str((frame_dir / f"slide-{len(scenes):02d}.jpg").resolve()) + "'")
     concat.write_text("\n".join(lines)+"\n", encoding="utf-8")
     output = output_dir / slug / f"{slug}.mp4"
@@ -128,20 +128,28 @@ def build_sample_batch(output_dir: Path):
     source_url = "https://cricketdatabase.com/matches/2026-11-09-royal-desert-champions-v-united-tigers"
     source = "Cricket Database scorecard (match-level figures)"
     pending = "Scorecard review pending: innings extras do not reconcile in normalized data and listing format conflicts with competition label. Not approved for publication."
+    # Each Reel follows a deliberate story arc: hook -> context -> evidence -> meaning -> CTA.
+    # Voiceover is supplied for editorial review; this QA render remains silent.
     common = [
-        {"eyebrow":"Stats & Analytics","title":"45 off 21: the acceleration","body":"Fakhar Zaman  •  45 runs  •  21 balls  •  SR 214.29","note":"A single-match performance, not a career or season record."},
-        {"eyebrow":"Stats & Analytics","title":"The impact with the ball","body":"Abbas Afridi  •  3 wickets  •  10 runs  •  2 overs","note":"Match figures as listed on the source scorecard."},
-        {"eyebrow":"Stats & Analytics","title":"Read the numbers in context","body":"One scorecard. Two standout contributions. No career-level conclusions.","note":pending},
+        {"eyebrow":"THE HOOK","title":"21 balls. 45 runs.","body":"A strike rate of 214.29","note":"FAKHAR ZAMAN  •  SCORECARD PERFORMANCE","voiceover":"Twenty-one balls. Forty-five runs. Fakhar Zaman's innings moved at a strike rate of 214.29."},
+        {"eyebrow":"THE CONTEXT","title":"Not just a quick cameo","body":"45 from 21 deliveries","note":"One innings only — not a career or season statistic.","voiceover":"The headline is not just the total. It is how quickly those runs came: forty-five from twenty-one."},
+        {"eyebrow":"THE COUNTERPOINT","title":"The ball had an answer","body":"Abbas Afridi: 3 for 10","note":"2 overs  •  Match figures listed by the scorecard","voiceover":"At the other end of the scorecard, Abbas Afridi delivered three wickets for ten runs in two overs."},
+        {"eyebrow":"THE TAKEAWAY","title":"Two different forms of impact","body":"Batting tempo meets bowling control","note":"These are individual match figures; no unsupported cause or player-of-the-match claim is made.","voiceover":"One scorecard gives us two distinct performances: rapid scoring with the bat, and a three-wicket return with the ball."},
+        {"eyebrow":"JOIN THE DEBATE","title":"Which number stands out?","body":"45 off 21  or  3 for 10?","note":"Source: Cricket Database scorecard  •  QA review only","voiceover":"Which performance stands out more to you? Forty-five off twenty-one, or three for ten? Tell us below."},
     ]
     battles = [
-        {"eyebrow":"Player comparison","title":"Two batting contributions","body":"Fakhar Zaman 45 off 21  •  SR 214.29","note":"Compared with Waseem Muhammad's innings in the same scorecard."},
-        {"eyebrow":"Player comparison","title":"Waseem Muhammad","body":"24 off 17  •  SR 141.18","note":"Strike rates calculated from the listed runs and balls."},
-        {"eyebrow":"Player comparison","title":"Different scoring tempo","body":"Fakhar: +73.11 strike-rate points in this innings","note":"This is a same-match performance comparison, not a direct batter-v-bowler matchup or career comparison."},
+        {"eyebrow":"THE HOOK","title":"Same scorecard. Different tempo.","body":"Fakhar Zaman vs Waseem Muhammad","note":"A comparison of two listed innings — not a career rivalry.","voiceover":"Two batting contributions from one scorecard. The difference is the pace at which they scored."},
+        {"eyebrow":"BATTER ONE","title":"Fakhar sets the pace","body":"45 runs from 21 balls","note":"Strike rate: 214.29","voiceover":"Fakhar Zaman scored forty-five from twenty-one deliveries, striking at 214.29."},
+        {"eyebrow":"BATTER TWO","title":"Waseem builds his innings","body":"24 runs from 17 balls","note":"Strike rate: 141.18","voiceover":"Waseem Muhammad made twenty-four from seventeen, at a strike rate of 141.18."},
+        {"eyebrow":"THE COMPARISON","title":"A 73.11-point gap","body":"214.29  vs  141.18","note":"Difference in listed innings strike rates; not a measure of overall player quality.","voiceover":"That is a difference of 73.11 strike-rate points in these innings. It describes this scorecard, not their overall ability."},
+        {"eyebrow":"YOUR VERDICT","title":"Which innings would you pick?","body":"Explosive scoring or measured contribution?","note":"Source: Cricket Database scorecard  •  QA review only","voiceover":"Which innings would you choose for your team? Share your view."},
     ]
     analyst = [
-        {"eyebrow":"Match Intelligence","title":"A short successful chase","body":"United Tigers 84/1  •  7 overs","note":"Chase figures from the scorecard listing."},
-        {"eyebrow":"Match Intelligence","title":"The result","body":"United Tigers won by 9 wickets","note":"As stated in the provider scorecard."},
-        {"eyebrow":"Match Intelligence","title":"What we can say","body":"The chase reached 84 with one wicket down in seven overs.","note":"No unsupported tactical cause is inferred from the available summary. "+pending},
+        {"eyebrow":"THE HOOK","title":"84 chased. One wicket down.","body":"United Tigers finished in 7 overs","note":"The scorecard records a nine-wicket win.","voiceover":"An eighty-four run target. United Tigers reached it with one wicket down in seven overs."},
+        {"eyebrow":"THE SCOREBOARD","title":"The chase in numbers","body":"84 for 1  •  7 overs","note":"Run rate from listed total and overs: 12.00 per over.","voiceover":"The listed chase finished at eighty-four for one after seven overs — twelve runs per over."},
+        {"eyebrow":"THE RESULT","title":"A nine-wicket finish","body":"United Tigers won","note":"Result as recorded by the provider scorecard.","voiceover":"The recorded result: United Tigers won by nine wickets."},
+        {"eyebrow":"WHAT THE DATA SAYS","title":"A dominant-looking finish","body":"Fast chase. One wicket lost.","note":"We cannot infer the tactical cause from the summary alone; innings detail needs verification.","voiceover":"The scoreboard shows a fast chase with one wicket lost. It does not, by itself, tell us which tactical choices made the difference."},
+        {"eyebrow":"JOIN THE ANALYSIS","title":"What would you investigate next?","body":"Powerplay scoring  •  partnerships  •  boundaries","note":"Source: Cricket Database scorecard  •  QA review only","voiceover":"To explain why the chase was so quick, we'd next examine powerplay scoring, partnerships and boundary count. What would you look at first?"},
     ]
     items = [
         {"slug":"stats-analytics","title":"Stats & Analytics: Fakhar and Abbas", "pillar":"stats", "scenes":common},
@@ -154,7 +162,7 @@ def build_sample_batch(output_dir: Path):
         manifest["reels"].append({"title":item["title"],"slug":item["slug"],"pillar":item["pillar"],"video":str(path),"duration_seconds":len(item["scenes"])*3,"scene_count":len(item["scenes"])})
         storyboard = ["# "+item["title"], "", "**QA SAMPLE ONLY — NOT FOR PUBLICATION**", "", pending, "", "Source: "+source+" — "+source_url, ""]
         for i, scene in enumerate(item["scenes"],1):
-            storyboard += [f"## Scene {i}", f"**{scene['eyebrow']}**", f"**{scene['title']}**", scene["body"], scene.get("note",""), ""]
+            storyboard += [f"## Scene {i}", f"**{scene['eyebrow']}**", f"**{scene['title']}**", scene["body"], scene.get("note",""), "", "**Voiceover:** "+scene.get("voiceover",""), ""]
         (output_dir/item["slug"]/"storyboard.md").write_text("\n".join(storyboard),encoding="utf-8")
     output_dir.mkdir(parents=True,exist_ok=True)
     (output_dir/"sample-batch-manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
