@@ -80,7 +80,7 @@ def render_reel(title: str, scenes: list[dict], output_dir: Path, slug: str):
         lines.append("file '" + str((frame_dir / f"slide-{i:02d}.jpg").resolve()) + "'")
         lines.append("duration 3")
     lines.append("file '" + str((frame_dir / f"slide-{len(scenes):02d}.jpg").resolve()) + "'")
-    concat.write_text("\\n".join(lines)+"\\n", encoding="utf-8")
+    concat.write_text("\n".join(lines)+"\n", encoding="utf-8")
     output = output_dir / slug / f"{slug}.mp4"
     subprocess.run([
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "concat",
@@ -121,7 +121,7 @@ def build_sample_batch(output_dir: Path):
         storyboard = ["# "+item["title"], "", "**QA SAMPLE ONLY — NOT FOR PUBLICATION**", "", pending, "", "Source: "+source+" — "+source_url, ""]
         for i, scene in enumerate(item["scenes"],1):
             storyboard += [f"## Scene {i}", f"**{scene['eyebrow']}**", f"**{scene['title']}**", scene["body"], scene.get("note",""), ""]
-        (output_dir/item["slug"]/"storyboard.md").write_text("\\n".join(storyboard),encoding="utf-8")
+        (output_dir/item["slug"]/"storyboard.md").write_text("\n".join(storyboard),encoding="utf-8")
     output_dir.mkdir(parents=True,exist_ok=True)
     (output_dir/"sample-batch-manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     return manifest
