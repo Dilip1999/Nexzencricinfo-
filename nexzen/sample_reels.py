@@ -117,7 +117,7 @@ def build_sample_batch(output_dir: Path):
     manifest = {"status":"qa_sample_only","publish_eligible":False,"audio":"silent review render; add licensed/original soundtrack only after owner approval","source":{"name":source,"url":source_url},"data_quality_note":pending,"reels":[]}
     for item in items:
         path = render_reel(item["title"], item["scenes"], output_dir, item["slug"])
-        manifest["reels"].append({"title":item["title"],"pillar":item["pillar"],"video":str(path),"duration_seconds":len(item["scenes"])*3,"scene_count":len(item["scenes"])})
+        manifest["reels"].append({"title":item["title"],"slug":item["slug"],"pillar":item["pillar"],"video":str(path),"duration_seconds":len(item["scenes"])*3,"scene_count":len(item["scenes"])})
         storyboard = ["# "+item["title"], "", "**QA SAMPLE ONLY — NOT FOR PUBLICATION**", "", pending, "", "Source: "+source+" — "+source_url, ""]
         for i, scene in enumerate(item["scenes"],1):
             storyboard += [f"## Scene {i}", f"**{scene['eyebrow']}**", f"**{scene['title']}**", scene["body"], scene.get("note",""), ""]
