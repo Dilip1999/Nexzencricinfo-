@@ -1,0 +1,85 @@
+{
+  "match": "India vs New Zealand, 1st ODI, New Zealand tour of India, 2026",
+  "venue": "BCA Stadium, Kotambi, Vadodara",
+  "result": "India won by 4 wickets",
+  "visible_innings": {
+    "team": "India",
+    "score": "306-6",
+    "overs": "49"
+  },
+  "batting": [
+    {
+      "name": "Rohit Sharma",
+      "runs": 26,
+      "balls": 29,
+      "fours": 3,
+      "sixes": 2,
+      "strike_rate": 89.66
+    },
+    {
+      "name": "Shubman Gill",
+      "runs": 56,
+      "balls": 71,
+      "fours": 3,
+      "sixes": 2,
+      "strike_rate": 78.87
+    },
+    {
+      "name": "Virat Kohli",
+      "runs": 93,
+      "balls": 91,
+      "fours": 8,
+      "sixes": 1,
+      "strike_rate": 102.2
+    },
+    {
+      "name": "Shreyas Iyer",
+      "runs": 49,
+      "balls": 47,
+      "fours": 4,
+      "sixes": 1,
+      "strike_rate": 104.26
+    },
+    {
+      "name": "Ravindra Jadeja",
+      "runs": 4,
+      "balls": 5,
+      "fours": 0,
+      "sixes": 0,
+      "strike_rate": 80
+    },
+    {
+      "name": "KL Rahul",
+      "runs": 29,
+      "balls": 21,
+      "fours": 2,
+      "sixes": 1,
+      "strike_rate": 138.1,
+      "status": "not out"
+    },
+    {
+      "name": "Harshit Rana",
+      "runs": 29,
+      "balls": 23,
+      "fours": 2,
+      "sixes": 1,
+      "strike_rate": 126.09
+    },
+    {
+      "name": "Washington Sundar",
+      "runs": 7,
+      "balls": 7,
+      "fours": 0,
+      "sixes": 0,
+      "strike_rate": 100,
+      "status": "not out"
+    }
+  ],
+  "provenance": "Transcribed only from the user-provided scorecard screenshot.",
+  "limitations": [
+    "Screenshot shows only India's second-innings batting table.",
+    "New Zealand innings and bowling figures are not visible.",
+    "Match date is clipped in the screenshot.",
+    "Do not infer the target, first-innings total, partnership details, or tactical cause from this screenshot."
+  ]
+}
