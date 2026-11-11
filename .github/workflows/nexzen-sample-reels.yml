@@ -26,10 +26,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           python -m pip install 'Pillow>=10,<13'
-      - name: Download attributed Virat Kohli background photo
+      - name: Download featured player photo selected by story fixture
         run: |
-          mkdir -p nexzen/assets/players
-          curl -fL --retry 3 "https://upload.wikimedia.org/wikipedia/commons/6/6e/Virat_Kohli_Batting_%28cropped%29.jpg" -o nexzen/assets/players/virat_kohli.jpg
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import urllib.request
+          fixture = json.loads(Path("nexzen/fixtures/india_nz_1st_odi_2026_sample.json").read_text())
+          image = fixture["featured_player_image"]
+          target = Path("nexzen") / image["asset"]
+          target.parent.mkdir(parents=True, exist_ok=True)
+          request = urllib.request.Request(image["source_url"], headers={"User-Agent": "NexZenCricInfo-QA/1.0"})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              data = response.read()
+          if not data or len(data) < 10000:
+              raise SystemExit("Featured player image download is empty or unexpectedly small")
+          target.write_bytes(data)
+          print(f"Downloaded {image['player']} background image ({len(data)} bytes)")
+          PY
       - name: Run sample Reel tests
         run: python -m unittest tests.test_sample_reels -v
       - name: Render one selected India vs New Zealand story Reel
