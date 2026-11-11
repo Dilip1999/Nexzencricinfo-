@@ -1,0 +1,36 @@
+name: NexZenCricInfo QA Sample Reels
+
+on:
+  push:
+    branches: [QA]
+    paths:
+      - 'nexzen/sample_reels.py'
+      - 'tests/test_sample_reels.py'
+      - '.github/workflows/nexzen-sample-reels.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-sample-reels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install rendering dependency
+        run: python -m pip install 'Pillow>=10,<13'
+      - name: Run sample Reel tests
+        run: python -m unittest tests.test_sample_reels -v
+      - name: Render three silent QA review Reels
+        run: python -m nexzen.sample_reels
+      - name: Upload QA sample batch
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexzen-three-sample-reels-qa
+          path: qa-sample-reels/
+          if-no-files-found: error
+          retention-days: 7
