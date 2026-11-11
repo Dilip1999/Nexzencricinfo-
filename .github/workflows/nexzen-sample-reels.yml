@@ -21,8 +21,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install rendering dependency
-        run: python -m pip install 'Pillow>=10,<13'
+      - name: Install FFmpeg and rendering dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install 'Pillow>=10,<13'
       - name: Run sample Reel tests
         run: python -m unittest tests.test_sample_reels -v
       - name: Render three silent QA review Reels
