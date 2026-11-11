@@ -5,6 +5,7 @@ on:
     branches: [QA]
     paths:
       - 'nexzen/sample_reels.py'
+      - 'nexzen/fixtures/india_nz_1st_odi_2026_sample.json'
       - 'tests/test_sample_reels.py'
       - '.github/workflows/nexzen-sample-reels.yml'
   workflow_dispatch:
@@ -25,24 +26,39 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          python -m pip install 'Pillow>=10,<13'
-      - name: Download featured player photo selected by story fixture
+          python -m pip install --disable-pip-version-check --no-cache-dir 'Pillow==11.3.0'
+      - name: Download and validate story-selected player image
         run: |
           python - <<'PY'
           import json
-          from pathlib import Path
           import urllib.request
-          fixture = json.loads(Path("nexzen/fixtures/india_nz_1st_odi_2026_sample.json").read_text())
-          image = fixture["featured_player_image"]
-          target = Path("nexzen") / image["asset"]
+          from pathlib import Path
+          from PIL import Image
+          fixture = json.loads(Path("nexzen/fixtures/india_nz_1st_odi_2026_sample.json").read_text(encoding="utf-8"))
+          meta = fixture["featured_player_image"]
+          url = meta["source_url"]
+          if not url.startswith("https://upload.wikimedia.org/"):
+              raise SystemExit("Unapproved image host")
+          relative = Path(meta["asset"])
+          if relative.is_absolute() or ".." in relative.parts:
+              raise SystemExit("Unsafe image destination path")
+          target = Path("nexzen") / relative
           target.parent.mkdir(parents=True, exist_ok=True)
-          request = urllib.request.Request(image["source_url"], headers={"User-Agent": "NexZenCricInfo-QA/1.0"})
-          with urllib.request.urlopen(request, timeout=30) as response:
-              data = response.read()
-          if not data or len(data) < 10000:
-              raise SystemExit("Featured player image download is empty or unexpectedly small")
+          request = urllib.request.Request(url, headers={"User-Agent": "NexZenCricInfo-QA/1.0"})
+          with urllib.request.urlopen(request, timeout=25) as response:
+              if response.geturl().split("/")[2] != "upload.wikimedia.org":
+                  raise SystemExit("Image redirect to unapproved host")
+              if response.headers.get_content_type() not in {"image/jpeg", "image/png", "image/webp"}:
+                  raise SystemExit("Unexpected image content type")
+              data = response.read(8 * 1024 * 1024 + 1)
+          if len(data) < 10000 or len(data) > 8 * 1024 * 1024:
+              raise SystemExit("Image size outside allowed bounds")
           target.write_bytes(data)
-          print(f"Downloaded {image['player']} background image ({len(data)} bytes)")
+          with Image.open(target) as img:
+              if img.format not in {"JPEG", "PNG", "WEBP"} or not (400 <= img.width <= 8000) or not (400 <= img.height <= 8000):
+                  raise SystemExit("Image format or dimensions rejected")
+              img.verify()
+          print(f"Validated image for {meta['player']}; bytes={len(data)}")
           PY
       - name: Run sample Reel tests
         run: python -m unittest tests.test_sample_reels -v
