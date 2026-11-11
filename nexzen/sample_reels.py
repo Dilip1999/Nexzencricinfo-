@@ -39,75 +39,81 @@ def wrap(draw, text, face, max_width):
     return lines
 
 def render_card(scene: dict, index: int, total: int, output: Path):
-    # Match the user's supplied NexZenCricInfo reference: deep navy, electric cyan,
-    # gold headline accents, framed hero area and subtle violet lower glow.
-    background_path = Path(scene.get("background_image", ""))
-    if background_path.is_file():
-        source = Image.open(background_path).convert("RGB")
-        # Cover the full vertical canvas while keeping the player near the center.
-        scale = max(W / source.width, H / source.height)
-        resized = source.resize((int(source.width * scale), int(source.height * scale)), Image.Resampling.LANCZOS)
-        left = max(0, (resized.width - W) // 2)
-        top = max(0, (resized.height - H) // 2)
-        image = resized.crop((left, top, left + W, top + H))
-        # Dark navy treatment keeps the real player visible behind legible editorial text.
-        navy_overlay = Image.new("RGB", (W, H), NAVY)
-        image = Image.blend(image, navy_overlay, 0.56)
-        # Strengthen the lower text zone without hiding the player's silhouette.
-        shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        shade_draw = ImageDraw.Draw(shade)
-        shade_draw.rectangle((0, 210, W, H), fill=(3, 13, 37, 65))
-        image = Image.alpha_composite(image.convert("RGBA"), shade).convert("RGB")
-    else:
-        image = Image.new("RGB", (W, H), NAVY)
-        pixels = image.load()
-        for y in range(H):
-            t = y / max(1, H-1)
-            base = tuple(int(NAVY[i] * (1-t) + NAVY_LIGHT[i] * t) for i in range(3))
-            for x in range(W):
-                glow = max(0.0, 1.0 - (((x-W*0.52)/(W*0.8))**2 + ((y-H*0.94)/(H*0.42))**2))
-                pixels[x, y] = tuple(min(255, int(base[i] + PURPLE[i]*glow*0.24)) for i in range(3))
+    # Reference-led composition: compact brand header, visible cricket photo hero,
+    # story headline below the image, and a clean editorial footer.
+    image = Image.new("RGB", (W, H), NAVY)
     draw = ImageDraw.Draw(image)
-    # Outer neon frame and inner content frame
-    draw.rounded_rectangle((20, 20, W-20, H-20), radius=36, outline=CYAN, width=4)
-    draw.rounded_rectangle((42, 42, W-42, H-42), radius=28, outline=CYAN_DARK, width=2)
-    draw.text((72, 76), "NEXZENCRICINFO", font=font(39, True), fill=WHITE)
-    draw.text((72, 132), "NEXT GEN CRICKET  /  NEWS  •  RECORDS  •  INSIGHT", font=font(21, True), fill=MUTED)
-    draw.line((72, 190, W-72, 190), fill=CYAN, width=3)
+    draw.rounded_rectangle((20, 20, W-20, H-20), radius=34, outline=CYAN, width=4)
+    draw.rounded_rectangle((42, 42, W-42, H-42), radius=26, outline=CYAN_DARK, width=2)
+    draw.text((72, 64), "NEXZENCRICINFO", font=font(38, True), fill=WHITE)
+    draw.text((72, 118), "NEXT GEN CRICKET  /  NEWS  •  RECORDS  •  INSIGHT", font=font(20, True), fill=MUTED)
+    draw.line((72, 174, W-72, 174), fill=CYAN, width=3)
 
-    # Story-first layout: no oversized decorative placeholder panel.
+    # Story index mirrors the supplied reference template.
+    draw.text((76, 208), "DAILY CRICKET", font=font(22, True), fill=CYAN)
+    draw.text((330, 208), f"/  STORY {index:02d}  /  {total:02d}", font=font(22, True), fill=GOLD)
+    for dot in range(total):
+        x = W - 250 + dot * 38
+        draw.ellipse((x, 214, x+13, 227), fill=GOLD if dot == index-1 else NAVY,
+                     outline=GOLD if dot == index-1 else MUTED, width=2)
+
+    # Prominent, real player photograph in a framed hero panel (not a faint full-canvas watermark).
+    hero_box = (68, 260, W-68, 1035)
+    draw.rounded_rectangle(hero_box, radius=18, fill=(8, 27, 62), outline=CYAN, width=3)
+    background_value = scene.get("background_image", "")
+    background_path = Path(background_value)
+    if not background_path.is_absolute():
+        background_path = Path(__file__).parent / background_path
+    if background_path.is_file():
+        with Image.open(background_path) as source_file:
+            source = source_file.convert("RGB")
+            box_w, box_h = hero_box[2]-hero_box[0]-16, hero_box[3]-hero_box[1]-16
+            scale = max(box_w/source.width, box_h/source.height)
+            resized = source.resize((int(source.width*scale), int(source.height*scale)), Image.Resampling.LANCZOS)
+            left = max(0, (resized.width-box_w)//2)
+            top = max(0, (resized.height-box_h)//2)
+            photo = resized.crop((left, top, left+box_w, top+box_h))
+        # Keep the photograph bright and recognizable; only a subtle lower fade protects text-free photo area.
+        photo_overlay = Image.new("RGBA", photo.size, (0,0,0,0))
+        overlay_draw = ImageDraw.Draw(photo_overlay)
+        for yy in range(photo.height):
+            alpha = int(4 + 22 * (yy / max(1, photo.height-1)))
+            overlay_draw.line((0, yy, photo.width, yy), fill=(3,13,37,alpha))
+        photo = Image.alpha_composite(photo.convert("RGBA"), photo_overlay).convert("RGB")
+        image.paste(photo, (hero_box[0]+8, hero_box[1]+8))
+    else:
+        draw.text((112, 560), "PLAYER PHOTO NOT FOUND", font=font(34, True), fill=GOLD)
+        draw.text((112, 620), "QA render must include the licensed image asset", font=font(22), fill=WHITE)
+
+    draw = ImageDraw.Draw(image)
+    # Thin inner frame and bottom fade of hero photograph.
+    draw.rounded_rectangle(hero_box, radius=18, outline=CYAN, width=3)
+    # Headline begins immediately under the photo, as in the user's example.
     eyebrow = scene["eyebrow"].upper()
-    draw.text((88, 270), eyebrow, font=font(27, True), fill=CYAN)
-    title_font = font(76, True)
-    title_lines = wrap(draw, scene["title"], title_font, W-176)
-    y = 350
+    draw.text((82, 1070), eyebrow, font=font(24, True), fill=CYAN)
+    title_font = font(59, True)
+    title_lines = wrap(draw, scene["title"], title_font, W-164)
+    y = 1122
     for line in title_lines[:2]:
-        draw.text((88, y), line, font=title_font, fill=WHITE)
-        y += 92
-    body_y = y + 18
-    for line in wrap(draw, scene["body"], font(40, True), W-176)[:3]:
-        draw.text((90, body_y), line, font=font(40, True), fill=GOLD)
-        body_y += 58
-    note_y = body_y + 42
-    for line in wrap(draw, scene.get("note", ""), font(23), W-176)[:3]:
-        draw.text((90, note_y), line, font=font(23), fill=MUTED)
-        note_y += 36
+        draw.text((82, y), line, font=title_font, fill=WHITE)
+        y += 70
+    body_y = y + 12
+    for line in wrap(draw, scene["body"], font(34, True), W-164)[:2]:
+        draw.text((84, body_y), line, font=font(34, True), fill=GOLD)
+        body_y += 48
+    note_y = body_y + 20
+    for line in wrap(draw, scene.get("note", ""), font(21), W-164)[:2]:
+        draw.text((84, note_y), line, font=font(21), fill=MUTED)
+        note_y += 30
 
-
-    if scene.get("spotlight_value") and scene.get("spotlight_label"):
-        panel_top = min(max(note_y + 70, 850), 1260)
-        panel_bottom = panel_top + 250
-        draw.rounded_rectangle((76, panel_top, W-76, panel_bottom), radius=24,
-                               fill=(8, 29, 68), outline=CYAN_DARK, width=2)
-        draw.text((112, panel_top+28), scene["spotlight_label"].upper(),
-                  font=font(22, True), fill=CYAN)
-        draw.text((112, panel_top+78), scene["spotlight_value"],
-                  font=font(72, True), fill=GOLD)
-
-    draw.line((88, H-245, W-88, H-245), fill=GOLD, width=2)
-    draw.text((88, H-205), "NEXZENCRICINFO  •  CRICKET STORIES WITH CONTEXT", font=font(21, True), fill=CYAN)
-    draw.text((88, H-155), "QA SAMPLE ONLY  •  NOT APPROVED FOR PUBLICATION", font=font(19, True), fill=MUTED)
-    draw.text((W-145, H-155), f"{index:02d}/{total:02d}", font=font(22, True), fill=WHITE)
+    # Compact branded footer; no empty decorative stat panel.
+    footer_y = 1690
+    draw.line((110, footer_y, 420, footer_y), fill=GOLD, width=2)
+    draw.ellipse((525, footer_y-15, 555, footer_y+15), outline=GOLD, width=2)
+    draw.line((660, footer_y, 970, footer_y), fill=GOLD, width=2)
+    draw.text((72, 1750), "NEXZENCRICINFO  •  NEXT GEN CRICKET", font=font(18, True), fill=CYAN)
+    draw.text((72, 1800), "QA SAMPLE ONLY  •  NOT APPROVED FOR PUBLICATION", font=font(17, True), fill=MUTED)
+    draw.text((W-145, 1800), f"{index:02d}/{total:02d}", font=font(20, True), fill=WHITE)
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, quality=94)
 
