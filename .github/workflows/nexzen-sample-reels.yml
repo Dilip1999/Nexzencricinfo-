@@ -26,6 +26,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           python -m pip install 'Pillow>=10,<13'
+      - name: Download attributed Virat Kohli background photo
+        run: |
+          mkdir -p nexzen/assets/players
+          curl -fL --retry 3 "https://upload.wikimedia.org/wikipedia/commons/6/6e/Virat_Kohli_Batting_%28cropped%29.jpg" -o nexzen/assets/players/virat_kohli.jpg
       - name: Run sample Reel tests
         run: python -m unittest tests.test_sample_reels -v
       - name: Render one selected India vs New Zealand story Reel
