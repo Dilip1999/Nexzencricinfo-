@@ -16,16 +16,18 @@ permissions:
 jobs:
   render-sample-reels:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install FFmpeg and rendering dependency
+          cache: pip
+      - name: Verify preinstalled FFmpeg and install pinned renderer dependency
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          set -euo pipefail
+          command -v ffmpeg
+          ffmpeg -version | head -n 1
           python -m pip install --disable-pip-version-check --no-cache-dir 'Pillow==11.3.0'
       - name: Download and validate story-selected player image
         run: |
