@@ -39,8 +39,6 @@ def wrap(draw, text, face, max_width):
     return lines
 
 def render_card(scene: dict, index: int, total: int, output: Path):
-    # Reference-led composition: compact brand header, visible cricket photo hero,
-    # story headline below the image, and a clean editorial footer.
     image = Image.new("RGB", (W, H), NAVY)
     draw = ImageDraw.Draw(image)
     draw.rounded_rectangle((20, 20, W-20, H-20), radius=34, outline=CYAN, width=4)
@@ -48,8 +46,6 @@ def render_card(scene: dict, index: int, total: int, output: Path):
     draw.text((72, 64), "NEXZENCRICINFO", font=font(38, True), fill=WHITE)
     draw.text((72, 118), "NEXT GEN CRICKET  /  NEWS  •  RECORDS  •  INSIGHT", font=font(20, True), fill=MUTED)
     draw.line((72, 174, W-72, 174), fill=CYAN, width=3)
-
-    # Story index mirrors the supplied reference template.
     draw.text((76, 208), "DAILY CRICKET", font=font(22, True), fill=CYAN)
     draw.text((330, 208), f"/  STORY {index:02d}  /  {total:02d}", font=font(22, True), fill=GOLD)
     for dot in range(total):
@@ -57,65 +53,66 @@ def render_card(scene: dict, index: int, total: int, output: Path):
         draw.ellipse((x, 214, x+13, 227), fill=GOLD if dot == index-1 else NAVY,
                      outline=GOLD if dot == index-1 else MUTED, width=2)
 
-    # Prominent, real player photograph in a framed hero panel (not a faint full-canvas watermark).
-    hero_box = (68, 260, W-68, 1035)
+    # Preserve the complete story-specific player photo: contain, never crop the face.
+    hero_box = (68, 260, W-68, 1015)
     draw.rounded_rectangle(hero_box, radius=18, fill=(8, 27, 62), outline=CYAN, width=3)
-    background_value = scene.get("background_image", "")
-    background_path = Path(background_value)
+    background_path = Path(scene.get("background_image", ""))
     if not background_path.is_absolute():
         background_path = Path(__file__).parent / background_path
     if background_path.is_file():
         with Image.open(background_path) as source_file:
             source = source_file.convert("RGB")
-            box_w, box_h = hero_box[2]-hero_box[0]-16, hero_box[3]-hero_box[1]-16
-            scale = max(box_w/source.width, box_h/source.height)
-            resized = source.resize((int(source.width*scale), int(source.height*scale)), Image.Resampling.LANCZOS)
-            left = max(0, (resized.width-box_w)//2)
-            top = max(0, (resized.height-box_h)//2)
-            photo = resized.crop((left, top, left+box_w, top+box_h))
-        # Keep the photograph bright and recognizable; only a subtle lower fade protects text-free photo area.
-        photo_overlay = Image.new("RGBA", photo.size, (0,0,0,0))
-        overlay_draw = ImageDraw.Draw(photo_overlay)
-        for yy in range(photo.height):
-            alpha = int(4 + 22 * (yy / max(1, photo.height-1)))
-            overlay_draw.line((0, yy, photo.width, yy), fill=(3,13,37,alpha))
-        photo = Image.alpha_composite(photo.convert("RGBA"), photo_overlay).convert("RGB")
-        image.paste(photo, (hero_box[0]+8, hero_box[1]+8))
+            box_w, box_h = hero_box[2]-hero_box[0]-20, hero_box[3]-hero_box[1]-20
+            source.thumbnail((box_w, box_h), Image.Resampling.LANCZOS)
+            px = hero_box[0] + 10 + (box_w-source.width)//2
+            py = hero_box[1] + 10 + (box_h-source.height)//2
+            image.paste(source, (px, py))
     else:
         draw.text((112, 560), "PLAYER PHOTO NOT FOUND", font=font(34, True), fill=GOLD)
-        draw.text((112, 620), "QA render must include the licensed image asset", font=font(22), fill=WHITE)
-
+        draw.text((112, 620), "QA render must include the selected story image", font=font(22), fill=WHITE)
     draw = ImageDraw.Draw(image)
-    # Thin inner frame and bottom fade of hero photograph.
     draw.rounded_rectangle(hero_box, radius=18, outline=CYAN, width=3)
-    # Headline begins immediately under the photo, as in the user's example.
-    eyebrow = scene["eyebrow"].upper()
-    draw.text((82, 1070), eyebrow, font=font(24, True), fill=CYAN)
-    title_font = font(59, True)
+
+    draw.text((82, 1040), scene["eyebrow"].upper(), font=font(24, True), fill=CYAN)
+    title_font = font(55, True)
     title_lines = wrap(draw, scene["title"], title_font, W-164)
-    y = 1122
+    y = 1088
     for line in title_lines[:2]:
         draw.text((82, y), line, font=title_font, fill=WHITE)
-        y += 70
-    body_y = y + 12
-    for line in wrap(draw, scene["body"], font(34, True), W-164)[:2]:
-        draw.text((84, body_y), line, font=font(34, True), fill=GOLD)
-        body_y += 48
-    note_y = body_y + 20
-    for line in wrap(draw, scene.get("note", ""), font(21), W-164)[:2]:
-        draw.text((84, note_y), line, font=font(21), fill=MUTED)
-        note_y += 30
+        y += 62
+    body_y = y + 2
+    for line in wrap(draw, scene["body"], font(30, True), W-164)[:2]:
+        draw.text((84, body_y), line, font=font(30, True), fill=GOLD)
+        body_y += 40
+    note_y = body_y + 6
+    for line in wrap(draw, scene.get("note", ""), font(18), W-164)[:1]:
+        draw.text((84, note_y), line, font=font(18), fill=MUTED)
 
-    # Compact branded footer; no empty decorative stat panel.
-    footer_y = 1690
-    draw.line((110, footer_y, 420, footer_y), fill=GOLD, width=2)
-    draw.ellipse((525, footer_y-15, 555, footer_y+15), outline=GOLD, width=2)
-    draw.line((660, footer_y, 970, footer_y), fill=GOLD, width=2)
-    draw.text((72, 1750), "NEXZENCRICINFO  •  NEXT GEN CRICKET", font=font(18, True), fill=CYAN)
-    draw.text((72, 1800), "QA SAMPLE ONLY  •  NOT APPROVED FOR PUBLICATION", font=font(17, True), fill=MUTED)
-    draw.text((W-145, 1800), f"{index:02d}/{total:02d}", font=font(20, True), fill=WHITE)
+    # Bottom section displays only explicit, source-grounded statistics.
+    stats = scene.get("stats", [])
+    if stats:
+        panel_top, panel_bottom = 1450, 1685
+        draw.rounded_rectangle((76, panel_top, W-76, panel_bottom), radius=22,
+                               fill=(8, 27, 62), outline=CYAN, width=2)
+        cell_width = (W-176) / min(3, len(stats))
+        for stat_index, stat in enumerate(stats[:3]):
+            x0 = 88 + stat_index*cell_width
+            if stat_index:
+                draw.line((int(x0-10), panel_top+25, int(x0-10), panel_bottom-25),
+                          fill=CYAN_DARK, width=2)
+            draw.text((int(x0+12), panel_top+38), str(stat["value"]),
+                      font=font(43, True), fill=GOLD)
+            labels = wrap(draw, str(stat["label"]).upper(), font(16, True), int(cell_width-30))
+            for label_index, label in enumerate(labels[:2]):
+                draw.text((int(x0+12), panel_top+105+label_index*22), label,
+                          font=font(16, True), fill=CYAN)
+
+    draw.text((72, 1740), "NEXZENCRICINFO  •  NEXT GEN CRICKET", font=font(18, True), fill=CYAN)
+    draw.text((72, 1790), "QA SAMPLE ONLY  •  NOT APPROVED FOR PUBLICATION",
+              font=font(17, True), fill=MUTED)
+    draw.text((W-145, 1790), f"{index:02d}/{total:02d}", font=font(20, True), fill=WHITE)
     output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, quality=94)
+    image.save(output, quality=95)
 
 def render_reel(title: str, scenes: list[dict], output_dir: Path, slug: str):
     ffmpeg = shutil.which("ffmpeg")
