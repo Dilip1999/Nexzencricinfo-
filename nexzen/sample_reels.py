@@ -57,30 +57,12 @@ def render_card(scene: dict, index: int, total: int, output: Path):
     draw.text((72, 132), "NEXT GEN CRICKET  /  NEWS  •  RECORDS  •  INSIGHT", font=font(21, True), fill=MUTED)
     draw.line((72, 190, W-72, 190), fill=CYAN, width=3)
 
-    # Hero visual panel: designed as a deliberate photo slot. Actual player imagery
-    # is not fabricated; approved/licensed portraits can be inserted in a later pass.
-    hero_top, hero_bottom = 235, 1030
-    draw.rounded_rectangle((62, hero_top, W-62, hero_bottom), radius=26, fill=(8, 24, 59), outline=CYAN, width=3)
-    draw.rounded_rectangle((78, hero_top+16, W-78, hero_bottom-16), radius=18, outline=CYAN_DARK, width=2)
-    mid = W//2
-    draw.line((mid, hero_top+32, mid, hero_bottom-32), fill=CYAN, width=3)
-    # Stylized cricket graphic panels, clearly illustrative rather than fake portraits.
-    for left, right, label, sub in [
-        (94, mid-12, "BAT", "PLAYER PERFORMANCE"),
-        (mid+12, W-94, "BALL", "MATCH IMPACT"),
-    ]:
-        cx = (left+right)//2
-        draw.ellipse((cx-112, hero_top+150, cx+112, hero_top+374), outline=CYAN_DARK, width=5)
-        draw.line((cx-70, hero_top+344, cx+72, hero_top+206), fill=GOLD, width=17)
-        draw.line((cx-78, hero_top+357, cx+60, hero_top+219), fill=WHITE, width=5)
-        draw.text((left+16, hero_top+490), label, font=font(36, True), fill=CYAN)
-        draw.text((left+16, hero_top+548), sub, font=font(18, True), fill=MUTED)
-
+    # Story-first layout: no oversized decorative placeholder panel.
     eyebrow = scene["eyebrow"].upper()
-    draw.text((88, 1090), eyebrow, font=font(27, True), fill=CYAN)
+    draw.text((88, 270), eyebrow, font=font(27, True), fill=CYAN)
     title_font = font(76, True)
     title_lines = wrap(draw, scene["title"], title_font, W-176)
-    y = 1160
+    y = 350
     for line in title_lines[:2]:
         draw.text((88, y), line, font=title_font, fill=WHITE)
         y += 92
@@ -88,10 +70,21 @@ def render_card(scene: dict, index: int, total: int, output: Path):
     for line in wrap(draw, scene["body"], font(40, True), W-176)[:3]:
         draw.text((90, body_y), line, font=font(40, True), fill=GOLD)
         body_y += 58
-    note_y = body_y + 28
+    note_y = body_y + 42
     for line in wrap(draw, scene.get("note", ""), font(23), W-176)[:3]:
         draw.text((90, note_y), line, font=font(23), fill=MUTED)
         note_y += 36
+
+
+    if scene.get("spotlight_value") and scene.get("spotlight_label"):
+        panel_top = min(max(note_y + 70, 850), 1260)
+        panel_bottom = panel_top + 250
+        draw.rounded_rectangle((76, panel_top, W-76, panel_bottom), radius=24,
+                               fill=(8, 29, 68), outline=CYAN_DARK, width=2)
+        draw.text((112, panel_top+28), scene["spotlight_label"].upper(),
+                  font=font(22, True), fill=CYAN)
+        draw.text((112, panel_top+78), scene["spotlight_value"],
+                  font=font(72, True), fill=GOLD)
 
     draw.line((88, H-245, W-88, H-245), fill=GOLD, width=2)
     draw.text((88, H-205), "NEXZENCRICINFO  •  CRICKET STORIES WITH CONTEXT", font=font(21, True), fill=CYAN)
@@ -131,9 +124,9 @@ def build_sample_batch(output_dir: Path):
     source = fixture["provenance"]
     limitations = " ".join(fixture["limitations"])
     scenes = [
-        {"eyebrow":"THE HOOK","title":"Seven short of a hundred.","body":"Virat Kohli  •  93 off 91 balls","note":"8 fours  •  1 six  •  Strike rate 102.20","voiceover":"Seven runs short of a hundred. Virat Kohli made 93 from 91 balls against New Zealand in the first ODI."},
+        {"eyebrow":"THE HOOK","title":"Seven short of a hundred.","body":"Virat Kohli  •  93 off 91 balls","note":"8 fours  •  1 six  •  Strike rate 102.20","spotlight_value":"93","spotlight_label":"Runs from 91 balls","voiceover":"Seven runs short of a hundred. Virat Kohli made 93 from 91 balls against New Zealand in the first ODI."},
         {"eyebrow":"THE SUPPORTING STORY","title":"The innings around him","body":"Gill 56  •  Iyer 49","note":"Two more major contributions on India's scorecard.","voiceover":"Kohli wasn't the only contributor. Shubman Gill scored 56, while Shreyas Iyer added 49."},
-        {"eyebrow":"THE SCOREBOARD","title":"India reached 306 for 6","body":"49 overs  •  India won by 4 wickets","note":"Score and result exactly as shown in the supplied screenshot.","voiceover":"India's innings finished at 306 for six in 49 overs, and the scorecard records a four-wicket win."},
+        {"eyebrow":"THE SCOREBOARD","title":"India reached 306 for 6","body":"49 overs  •  India won by 4 wickets","note":"Score and result exactly as shown in the supplied screenshot.","spotlight_value":"306/6","spotlight_label":"India innings total","voiceover":"India's innings finished at 306 for six in 49 overs, and the scorecard records a four-wicket win."},
         {"eyebrow":"THE DETAIL","title":"A century that stayed just out of reach","body":"93 runs  •  8 boundaries for four  •  1 six","note":"Kohli was dismissed, caught by Michael Bracewell off Kyle Jamieson, according to the visible scorecard.","voiceover":"Kohli's 93 included eight fours and one six. The scorecard shows him caught by Michael Bracewell off Kyle Jamieson."},
         {"eyebrow":"JOIN THE DEBATE","title":"Was 93 the defining innings?","body":"Kohli 93  •  Gill 56  •  Iyer 49","note":"Based only on the visible India innings. First-innings context is not shown.","voiceover":"Which innings stood out most to you — Kohli's 93, Gill's 56, or Iyer's 49? Tell us in the comments."}
     ]
