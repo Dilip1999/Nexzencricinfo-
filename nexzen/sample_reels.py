@@ -52,7 +52,7 @@ def render_card(scene: dict, index: int, total: int, output: Path):
         image = resized.crop((left, top, left + W, top + H))
         # Dark navy treatment keeps the real player visible behind legible editorial text.
         navy_overlay = Image.new("RGB", (W, H), NAVY)
-        image = Image.blend(image, navy_overlay, 0.70)
+        image = Image.blend(image, navy_overlay, 0.56)
         # Strengthen the lower text zone without hiding the player's silhouette.
         shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         shade_draw = ImageDraw.Draw(shade)
