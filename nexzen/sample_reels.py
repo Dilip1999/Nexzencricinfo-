@@ -7,11 +7,14 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1080, 1920
-IVORY = (246, 241, 229)
-BURGUNDY = (105, 24, 48)
-CHARCOAL = (34, 33, 32)
-GOLD = (181, 145, 77)
-MUTED = (108, 99, 88)
+NAVY = (5, 17, 48)
+NAVY_LIGHT = (12, 31, 76)
+CYAN = (0, 220, 245)
+CYAN_DARK = (0, 120, 160)
+GOLD = (255, 190, 72)
+WHITE = (245, 249, 255)
+MUTED = (178, 198, 224)
+PURPLE = (66, 34, 130)
 
 def font(size: int, bold: bool = False):
     paths = [
@@ -36,33 +39,64 @@ def wrap(draw, text, face, max_width):
     return lines
 
 def render_card(scene: dict, index: int, total: int, output: Path):
-    image = Image.new("RGB", (W, H), IVORY)
+    # Match the user's supplied NexZenCricInfo reference: deep navy, electric cyan,
+    # gold headline accents, framed hero area and subtle violet lower glow.
+    image = Image.new("RGB", (W, H), NAVY)
+    pixels = image.load()
+    for y in range(H):
+        t = y / max(1, H-1)
+        base = tuple(int(NAVY[i] * (1-t) + NAVY_LIGHT[i] * t) for i in range(3))
+        for x in range(W):
+            glow = max(0.0, 1.0 - (((x-W*0.52)/(W*0.8))**2 + ((y-H*0.94)/(H*0.42))**2))
+            pixels[x, y] = tuple(min(255, int(base[i] + PURPLE[i]*glow*0.24)) for i in range(3))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, W, 26), fill=BURGUNDY)
-    draw.text((76, 82), "NEXZENCRICINFO", font=font(34, True), fill=CHARCOAL)
-    draw.text((76, 132), "THE CRICKET JOURNAL  /  EDITORIAL EDITION", font=font(19), fill=MUTED)
-    draw.line((76, 190, W-76, 190), fill=GOLD, width=3)
-    draw.text((76, 270), scene["eyebrow"].upper(), font=font(25, True), fill=BURGUNDY)
-    title_font = font(78, True)
-    y = 370
-    for line in wrap(draw, scene["title"], title_font, W-152):
-        draw.text((76, y), line, font=title_font, fill=CHARCOAL)
-        y += 100
-    y += 52
-    draw.rounded_rectangle((76, y, W-76, y+430), radius=28, fill=CHARCOAL)
-    body_font = font(47, True)
-    body_y = y+76
-    for line in wrap(draw, scene["body"], body_font, W-230):
-        draw.text((116, body_y), line, font=body_font, fill=IVORY)
-        body_y += 66
-    if scene.get("note"):
-        note_y = y+460
-        for line in wrap(draw, scene["note"], font(27), W-152):
-            draw.text((76, note_y), line, font=font(27), fill=MUTED)
-            note_y += 42
-    draw.line((76, H-220, W-76, H-220), fill=GOLD, width=2)
-    draw.text((76, H-175), "SCORECARD REVIEW PENDING  •  QA SAMPLE ONLY", font=font(23, True), fill=BURGUNDY)
-    draw.text((W-150, H-175), f"{index:02d}/{total:02d}", font=font(23, True), fill=CHARCOAL)
+    # Outer neon frame and inner content frame
+    draw.rounded_rectangle((20, 20, W-20, H-20), radius=36, outline=CYAN, width=4)
+    draw.rounded_rectangle((42, 42, W-42, H-42), radius=28, outline=CYAN_DARK, width=2)
+    draw.text((72, 76), "NEXZENCRICINFO", font=font(39, True), fill=WHITE)
+    draw.text((72, 132), "NEXT GEN CRICKET  /  NEWS  •  RECORDS  •  INSIGHT", font=font(21, True), fill=MUTED)
+    draw.line((72, 190, W-72, 190), fill=CYAN, width=3)
+
+    # Hero visual panel: designed as a deliberate photo slot. Actual player imagery
+    # is not fabricated; approved/licensed portraits can be inserted in a later pass.
+    hero_top, hero_bottom = 235, 1030
+    draw.rounded_rectangle((62, hero_top, W-62, hero_bottom), radius=26, fill=(8, 24, 59), outline=CYAN, width=3)
+    draw.rounded_rectangle((78, hero_top+16, W-78, hero_bottom-16), radius=18, outline=CYAN_DARK, width=2)
+    mid = W//2
+    draw.line((mid, hero_top+32, mid, hero_bottom-32), fill=CYAN, width=3)
+    # Stylized cricket graphic panels, clearly illustrative rather than fake portraits.
+    for left, right, label, sub in [
+        (94, mid-12, "BAT", "PLAYER PERFORMANCE"),
+        (mid+12, W-94, "BALL", "MATCH IMPACT"),
+    ]:
+        cx = (left+right)//2
+        draw.ellipse((cx-112, hero_top+150, cx+112, hero_top+374), outline=CYAN_DARK, width=5)
+        draw.line((cx-70, hero_top+344, cx+72, hero_top+206), fill=GOLD, width=17)
+        draw.line((cx-78, hero_top+357, cx+60, hero_top+219), fill=WHITE, width=5)
+        draw.text((left+16, hero_top+490), label, font=font(36, True), fill=CYAN)
+        draw.text((left+16, hero_top+548), sub, font=font(18, True), fill=MUTED)
+
+    eyebrow = scene["eyebrow"].upper()
+    draw.text((88, 1090), eyebrow, font=font(27, True), fill=CYAN)
+    title_font = font(76, True)
+    title_lines = wrap(draw, scene["title"], title_font, W-176)
+    y = 1160
+    for line in title_lines[:2]:
+        draw.text((88, y), line, font=title_font, fill=WHITE)
+        y += 92
+    body_y = y + 18
+    for line in wrap(draw, scene["body"], font(40, True), W-176)[:3]:
+        draw.text((90, body_y), line, font=font(40, True), fill=GOLD)
+        body_y += 58
+    note_y = body_y + 28
+    for line in wrap(draw, scene.get("note", ""), font(23), W-176)[:3]:
+        draw.text((90, note_y), line, font=font(23), fill=MUTED)
+        note_y += 36
+
+    draw.line((88, H-245, W-88, H-245), fill=GOLD, width=2)
+    draw.text((88, H-205), "NEXZENCRICINFO  •  CRICKET STORIES WITH CONTEXT", font=font(21, True), fill=CYAN)
+    draw.text((88, H-155), "QA SAMPLE ONLY  •  NOT APPROVED FOR PUBLICATION", font=font(19, True), fill=MUTED)
+    draw.text((W-145, H-155), f"{index:02d}/{total:02d}", font=font(22, True), fill=WHITE)
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, quality=94)
 
