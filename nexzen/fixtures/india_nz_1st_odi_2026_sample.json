@@ -81,5 +81,14 @@
     "New Zealand innings and bowling figures are not visible.",
     "Match date is clipped in the screenshot.",
     "Do not infer the target, first-innings total, partnership details, or tactical cause from this screenshot."
-  ]
+  ],
+  "featured_player_image": {
+    "player": "Virat Kohli",
+    "asset": "assets/players/virat_kohli.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Virat_Kohli_Batting_%28cropped%29.jpg",
+    "attribution": "lensbug.chandru / Wikimedia Commons",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0/",
+    "note": "Archival illustrative photograph, not from the 2026 match."
+  }
 }
